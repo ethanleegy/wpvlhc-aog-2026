@@ -1,0 +1,10 @@
+<div class="grid grid-cols-1 border-t border-l border-[#fffaf1]/25 min-[390px]:grid-cols-2 md:grid-cols-3">
+  {% for item in site.data.food_items %}
+    <label class="group relative flex min-h-[72px] cursor-pointer items-center gap-[14px] border-r border-b border-[#fffaf1]/25 px-[15px] py-3 font-display text-sm leading-[1.35] transition-colors hover:bg-white/7 min-[390px]:min-h-[86px] min-[390px]:gap-[9px] min-[390px]:px-[10px] md:min-h-[91px] md:gap-[14px] md:px-[17px] md:py-[15px] md:text-[15px]">
+      <input class="peer sr-only" type="checkbox" name="dish" value="{{ item.value }}">
+      <span class="shrink-0 font-sans text-[9px] tracking-[.1em] text-gold">{{ item.number }}</span>
+      <span>{{ item.label }}</span>
+      <span class="ml-auto grid size-[21px] shrink-0 place-items-center rounded-full border border-[#fffaf1]/50 font-sans text-sm text-transparent transition-colors peer-checked:border-gold peer-checked:bg-gold peer-checked:text-forest peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-[#fffaf1]" aria-hidden="true">+</span>
+    </label>
+  {% endfor %}
+</div>
