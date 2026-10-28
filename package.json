@@ -1,0 +1,27 @@
+{
+  "name": "wpvlhc-aog-2026",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "css:watch": "tailwindcss -i ./src/tailwind.css -o ./assets/css/tailwind.css --watch",
+    "css:build": "tailwindcss -i ./src/tailwind.css -o ./assets/css/tailwind.css --minify"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ethanleegy/wpvlhc-aog-2026.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ethanleegy/wpvlhc-aog-2026/issues"
+  },
+  "homepage": "https://github.com/ethanleegy/wpvlhc-aog-2026#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}
