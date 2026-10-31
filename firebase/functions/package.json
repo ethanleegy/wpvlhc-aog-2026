@@ -1,0 +1,29 @@
+{
+  "name": "wpvlhc-functions",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Christmas Gala invitations, RSVP, food contributions and church management API",
+  "main": "index.js",
+  "engines": {
+    "node": "24"
+  },
+  "scripts": {
+    "test": "node --test test/unit.test.cjs",
+    "test:integration": "node --test --test-concurrency=1 test/integration.test.cjs",
+    "start": "node --env-file-if-exists=.env.local src/dev.js",
+    "password:hash": "node scripts/password-hash.cjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.0.0",
+    "joi": "^18.1.2",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2"
+  }
+}

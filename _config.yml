@@ -18,3 +18,12 @@ port: 3000
 theme: minima
 plugins:
   - jekyll-feed
+
+# Backend source, admin tooling and private configuration must never enter _site.
+exclude:
+  - firebase
+  - api-spec
+  - node_modules
+  - package.json
+  - package-lock.json
+  - README.md

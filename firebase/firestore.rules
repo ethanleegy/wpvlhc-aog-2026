@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Only the server's Admin SDK may access event or management data.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

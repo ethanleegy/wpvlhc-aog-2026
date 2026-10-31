@@ -1,0 +1,15 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "InvitedGuests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId", "order": "ASCENDING" },
+        { "fieldPath": "rsvp", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "RateLimits", "fieldPath": "expiresAt", "ttl": true, "indexes": [] }
+  ]
+}

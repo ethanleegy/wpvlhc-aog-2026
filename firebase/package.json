@@ -1,0 +1,19 @@
+{
+  "name": "wpvlhc-firebase",
+  "private": true,
+  "version": "1.0.0",
+  "engines": { "node": "24" },
+  "scripts": {
+    "emulators": "firebase emulators:start --project demo-wpvlhc --only functions,firestore,hosting",
+    "test:integration": "firebase emulators:exec --project demo-wpvlhc --only firestore 'npm --prefix functions run test:integration'",
+    "spec:check": "node scripts/check-spec.cjs",
+    "seed": "node --env-file-if-exists=functions/.env.local scripts/seed.cjs",
+    "admin:build": "npm --prefix admin-dashboard run build",
+    "deploy": "npm run spec:check && npm --prefix functions test && npm run admin:build && firebase deploy --only functions,firestore,hosting"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
+    "firebase-tools": "^15.0.0",
+    "yaml": "^2.8.2"
+  }
+}

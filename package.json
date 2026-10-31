@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npm --prefix firebase/functions test && npm --prefix firebase run spec:check",
+    "admin:dev": "npm --prefix firebase/admin-dashboard run dev",
+    "admin:build": "npm --prefix firebase/admin-dashboard run build",
+    "firebase:emulators": "npm --prefix firebase run emulators",
     "css:watch": "tailwindcss -i ./src/tailwind.css -o ./assets/css/tailwind.css --watch",
     "css:build": "tailwindcss -i ./src/tailwind.css -o ./assets/css/tailwind.css --minify"
   },
