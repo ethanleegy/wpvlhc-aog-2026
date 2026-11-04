@@ -22,12 +22,12 @@ permalink: /
     <div class="relative z-10 mx-auto flex min-h-[min(810px,94svh)] max-w-[1240px] flex-col items-start justify-center px-[8vw] pt-[120px] pb-[110px] max-md:min-h-[min(760px,92svh)] max-md:px-[25px] max-md:pt-[125px] max-md:pb-[105px]">
       <p class="mb-6 text-[10px] leading-[1.5] font-bold tracking-[.22em] text-[#e8d5a9] uppercase">An evening of warmth &amp; wonder</p>
       <h1 id="hero-title" class="m-0 font-display text-[clamp(68px,10.4vw,144px)] leading-[.82] font-normal tracking-[-.075em]">The Christmas<br><em class="font-normal text-[#e5c992]">Gala</em></h1>
-      <p class="mt-8 mb-[30px] font-display text-[clamp(16px,2vw,21px)] tracking-[.02em]">Saturday, December 12 <span class="px-2 text-[#e5c992]" aria-hidden="true">·</span> 6 o’clock</p>
-      <a class="inline-flex items-center gap-7 border border-[#fffaf1]/65 px-[18px] py-[14px] text-[10px] font-bold tracking-[.15em] text-[#fffaf1] uppercase transition-colors hover:bg-[#fffaf1] hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red" href="#invitation">You’re invited <span aria-hidden="true">↓</span></a>
+      <p class="mt-8 mb-[30px] font-display text-[clamp(16px,2vw,21px)] tracking-[.02em]">Sunday, December 13 <span class="px-2 text-[#e5c992]" aria-hidden="true">·</span> 6 o’clock</p>
+      <a style="display: none" class="show-page inline-flex items-center gap-7 border border-[#fffaf1]/65 px-[18px] py-[14px] text-[10px] font-bold tracking-[.15em] text-[#fffaf1] uppercase transition-colors hover:bg-[#fffaf1] hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red" href="#invitation">You’re invited <span aria-hidden="true">↓</span></a>
     </div>
   </section>
 
-  <section class="bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,255,255,.54),transparent_57%),var(--color-paper)] px-6 py-28 max-md:px-[22px] max-md:py-[82px]" id="invitation" aria-labelledby="invitation-title">
+  <section style="display: none" class="show-page bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,255,255,.54),transparent_57%),var(--color-paper)] px-6 py-28 max-md:px-[22px] max-md:py-[82px]" id="invitation" aria-labelledby="invitation-title">
     <div class="mx-auto w-full max-w-[990px]">
       <div class="mx-auto max-w-[710px] text-center">
         <p class="mb-[19px] text-[10px] leading-[1.5] font-bold tracking-[.22em] text-red uppercase">A little note for you</p>
@@ -38,12 +38,12 @@ permalink: /
       <div class="my-[60px] grid grid-cols-1 border-y border-[#d7d1c5] max-md:my-[42px] md:my-[60px] md:grid-cols-3">
         <div class="flex min-h-[112px] flex-col justify-center border-b border-[#d7d1c5] px-[30px] py-[17px] text-center last:border-b-0 md:min-h-[145px] md:border-b-0 md:px-[30px] md:py-[22px] md:[&+div]:border-l">
           <span class="mb-[10px] text-[9px] font-bold tracking-[.2em] text-red uppercase">When</span>
-          <span class="font-display text-lg">Saturday, December 12, 2026</span>
+          <span class="font-display text-lg">Sunday, December 13, 2026</span>
           <span class="mt-1 text-[11px] text-muted">Dinner begins at 6:00 PM</span>
         </div>
         <div class="flex min-h-[112px] flex-col justify-center border-b border-[#d7d1c5] px-[30px] py-[17px] text-center last:border-b-0 md:min-h-[145px] md:border-b-0 md:px-[30px] md:py-[22px] md:[&+div]:border-l">
           <span class="mb-[10px] text-[9px] font-bold tracking-[.2em] text-red uppercase">Where</span>
-          <span class="font-display text-lg">World Prayer Vision Life Healing Center</span>
+          <span class="font-display text-lg">Olive Sandra Cummings Hall </br> World Prayer Vision Life Healing Center</span>
           <span class="mt-1 text-[11px] text-muted">Church Street, Anna Catherina, Guyana</span>
         </div>
         <div class="flex min-h-[112px] flex-col justify-center px-[30px] py-[17px] text-center md:min-h-[145px] md:px-[30px] md:py-[22px] md:border-l md:border-[#d7d1c5]">
@@ -88,12 +88,13 @@ permalink: /
         </fieldset>
         <div class="flex items-center justify-between gap-[18px] pt-6 max-[389px]:items-start max-[389px]:flex-col">
           <p class="m-0 text-[11px] text-[#fffaf1]/70" id="dish-count" aria-live="polite">Nothing selected yet</p>
-          <button class="inline-flex min-h-12 items-center gap-[27px] bg-[#e5c992] px-[19px] text-[10px] font-bold tracking-[.1em] text-[#182b23] uppercase transition-colors hover:bg-[#f0dfb8] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#fffaf1]" type="submit">Save my choices <span aria-hidden="true">↗</span></button>
         </div>
-        <p class="mt-4 min-h-6 text-right text-[13px] leading-[1.5] text-[#f0dfb8] max-[389px]:text-left" id="dish-message" aria-live="polite"></p>
       </form>
     </div>
   </section>
+  <div class="bg-[#182b23] px-6 pb-10 text-center max-md:px-[22px]" id="submit-wrapper" hidden>
+    <button class="submit-response inline-flex min-h-12 items-center gap-[27px] bg-[#e5c992] px-[19px] text-[10px] font-bold tracking-[.1em] text-[#182b23] uppercase transition-colors hover:bg-[#f0dfb8] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#fffaf1]" id="submit" type="submit" form="rsvp">Submit response <span aria-hidden="true">↗</span></button>
+  </div>
 
   <footer class="flex min-h-[105px] items-center justify-between gap-5 bg-[#182b23] px-[clamp(22px,6vw,88px)] py-[25px] text-[#fffaf1] max-md:flex-wrap max-md:justify-center max-md:text-center">
     <span class="text-[22px] text-gold" aria-hidden="true">✳</span>

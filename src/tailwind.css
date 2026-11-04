@@ -12,3 +12,7 @@
   --font-sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
   --font-display: "Iowan Old Style", "Baskerville", "Palatino Linotype", "Book Antiqua", Georgia, serif;
 }
+
+.submit-response {
+  margin: 2rem auto;
+}
