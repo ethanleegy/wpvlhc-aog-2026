@@ -7,16 +7,20 @@
   },
   "servers": [
     {
+      "url": "https://wpvlhc-aog-2026.web.app/v1",
+      "description": "Deployed API; use this absolute base from the public Jekyll site"
+    },
+    {
       "url": "/v1",
-      "description": "Same-origin Firebase Hosting (recommended for management)"
+      "description": "Same-origin Firebase management Hosting / local Vite proxy only"
     },
     {
       "url": "http://127.0.0.1:5001/demo-wpvlhc/us-central1/api/v1",
       "description": "Firebase Functions emulator"
     },
     {
-      "url": "https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/api/v1",
-      "description": "Replace YOUR_PROJECT_ID after deployment; allow the public site origin in ALLOWED_ORIGINS"
+      "url": "https://us-central1-wpvlhc-aog-2026.cloudfunctions.net/api/v1",
+      "description": "Direct deployed HTTPS function"
     }
   ],
   "tags": [
@@ -105,7 +109,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Liveness probe only. Does not validate configuration/database access and does not enable cross-origin browser reads. Use a same-origin request or a server/API client."
       }
     },
     "/token/{token}/status": {
@@ -348,7 +353,7 @@
             }
           }
         },
-        "description": "No personal data. Use returned IDs for submissions; static YAML values are not database IDs."
+        "description": "Returns active, unclaimed single-person contribution slots. Repeated names have separate IDs and must remain separate options. Restore the current guest’s saved items from GET /token/{token}."
       }
     },
     "/token/{token}/reply": {
@@ -401,7 +406,7 @@
             }
           },
           "409": {
-            "description": "Inactive food/church or locked unit",
+            "description": "Food slot already taken, inactive food/church or locked unit",
             "content": {
               "application/json": {
                 "schema": {
@@ -473,7 +478,7 @@
             }
           }
         ],
-        "description": "Atomic update. Repeat submissions replace choices, never add quantities. No client name, church or token in the body. 60 attempts per invitation per 15 minutes. Existing inactive items may be kept or reduced but cannot be increased.",
+        "description": "Atomic update. Repeat submissions replace choices, never add quantities. No client name, church or token in the body. 60 attempts per invitation per 15 minutes. Existing inactive items may be kept or reduced but cannot be increased. Each food item ID is a single-person slot. A competing claim returns 409 FOOD_ITEM_TAKEN. Removing the item or declining releases it; the owner may revise quantities.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1221,7 +1226,7 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]{1,80}$",
-              "example": "food-07"
+              "example": "wpvlhc-aog"
             }
           },
           {
@@ -1597,7 +1602,7 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]{1,80}$",
-              "example": "food-07"
+              "example": "gala-food-001"
             }
           },
           {
@@ -1726,7 +1731,7 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]{1,80}$",
-              "example": "food-07"
+              "example": "wpvlhc-aog"
             }
           },
           {
@@ -2225,7 +2230,7 @@
             }
           },
           "409": {
-            "description": "Inactive food/church or locked unit",
+            "description": "Food slot already taken, inactive food/church or locked unit",
             "content": {
               "application/json": {
                 "schema": {
@@ -2299,7 +2304,7 @@
             "description": "Required on every admin mutation, including login/logout."
           }
         ],
-        "description": "Uses the same atomic replacement rules as public replies. Permitted for inactive invitations; these remain excluded from reports.",
+        "description": "Uses the same atomic replacement rules as public replies. Permitted for inactive invitations; these remain excluded from reports. Each food item ID is a single-person slot. A competing claim returns 409 FOOD_ITEM_TAKEN. Removing the item or declining releases it; the owner may revise quantities.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2394,7 +2399,7 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]{1,80}$",
-              "example": "food-07"
+              "example": "wpvlhc-aog"
             },
             "description": "Optional church filter. Report counts include active invitations only."
           }
@@ -2485,7 +2490,7 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]{1,80}$",
-              "example": "food-07"
+              "example": "wpvlhc-aog"
             },
             "description": "Optional church filter. Report counts include active invitations only."
           }
@@ -2576,7 +2581,7 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9_-]{1,80}$",
-              "example": "food-07"
+              "example": "wpvlhc-aog"
             },
             "description": "Optional church filter. Report counts include active invitations only."
           }
@@ -2679,7 +2684,7 @@
           "id": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "wpvlhc-aog"
           },
           "name": {
             "type": "string",
@@ -2784,7 +2789,7 @@
           "id": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "gala-food-001"
           },
           "hasContributions": {
             "type": "boolean"
@@ -2796,6 +2801,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "claimedBy": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{24}$",
+            "nullable": true,
+            "readOnly": true,
+            "description": "Owning guest code, or null for an unclaimed slot. Management response only; cannot be set by clients."
           }
         },
         "required": [
@@ -2815,7 +2827,7 @@
           "id": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "gala-food-001"
           },
           "name": {
             "type": "string",
@@ -2852,7 +2864,7 @@
           "churchId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "wpvlhc-aog"
           },
           "active": {
             "type": "boolean",
@@ -2880,7 +2892,7 @@
           "churchId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "wpvlhc-aog"
           },
           "active": {
             "type": "boolean"
@@ -2905,7 +2917,7 @@
           "churchId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "wpvlhc-aog"
           },
           "active": {
             "type": "boolean",
@@ -2967,7 +2979,7 @@
           "foodItemId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "gala-food-001"
           },
           "quantity": {
             "type": "integer",
@@ -2992,7 +3004,7 @@
           "foodItemId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "gala-food-001"
           },
           "quantity": {
             "type": "integer",
@@ -3044,7 +3056,33 @@
           "rsvp",
           "items"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "properties": {
+              "rsvp": {
+                "type": "string",
+                "enum": [
+                  "yes"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "rsvp": {
+                "type": "string",
+                "enum": [
+                  "no"
+                ]
+              },
+              "items": {
+                "type": "array",
+                "maxItems": 0
+              }
+            }
+          }
+        ]
       },
       "Reply": {
         "type": "object",
@@ -3098,7 +3136,7 @@
               "id": {
                 "type": "string",
                 "pattern": "^[A-Za-z0-9_-]{1,80}$",
-                "example": "food-07"
+                "example": "wpvlhc-aog"
               },
               "name": {
                 "type": "string",
@@ -3251,7 +3289,7 @@
           "churchId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "wpvlhc-aog"
           },
           "name": {
             "type": "string",
@@ -3275,7 +3313,7 @@
           "foodItemId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "gala-food-001"
           },
           "name": {
             "type": "string",
@@ -3322,7 +3360,7 @@
           "churchId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "wpvlhc-aog"
           },
           "churchName": {
             "type": "string",
@@ -3332,7 +3370,7 @@
           "foodItemId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07"
+            "example": "gala-food-001"
           },
           "foodName": {
             "type": "string",
@@ -3373,7 +3411,7 @@
           "churchId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$",
-            "example": "food-07",
+            "example": "wpvlhc-aog",
             "nullable": true
           },
           "totals": {

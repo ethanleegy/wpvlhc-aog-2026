@@ -5,6 +5,25 @@ const { schemas, validate } = require("../src/validation");
 const { inviteUrl, buildReport } = require("../src/service");
 const { csvCell, guestCsv } = require("../src/csv");
 const { loadConfig } = require("../src/config");
+const { memberNames, foodSlots } = require("../../scripts/seed-data.cjs");
+
+test("seed contains 200 sample members and 150 separate Guyanese menu slots", () => {
+  assert.equal(memberNames.length, 200);
+  assert.equal(new Set(memberNames).size, 200);
+  assert.equal(foodSlots.length, 150);
+  assert.equal(new Set(foodSlots.map((food) => food.id)).size, 150);
+  const counts = new Map();
+  for (const food of foodSlots) {
+    const { id, ...payload } = food;
+    validate(schemas.foodCreate, payload);
+    counts.set(food.name, (counts.get(food.name) || 0) + 1);
+  }
+  assert.equal(counts.size, 50);
+  assert.ok([...counts.values()].every((count) => count === 3));
+  assert.equal(counts.get("Baked chicken"), 3);
+  for (const name of memberNames)
+    validate(schemas.guestCreate, { name, churchId: "wpvlhc-aog" });
+});
 
 test("replies require explicit quantities, unique known-shaped IDs and consistent attendance", () => {
   for (const payload of [

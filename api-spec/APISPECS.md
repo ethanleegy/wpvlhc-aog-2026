@@ -7,16 +7,17 @@ The complete machine-readable contract is [openapi.json](openapi.json), OpenAPI 
 | Environment | API base, including `/v1` |
 | --- | --- |
 | Local Functions emulator | `http://127.0.0.1:5001/demo-wpvlhc/us-central1/api/v1` |
-| Deployed public API | `https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/api/v1` |
+| Deployed public API | `https://wpvlhc-aog-2026.web.app/v1` |
+| Direct deployed function | `https://us-central1-wpvlhc-aog-2026.cloudfunctions.net/api/v1` |
 | Management on Firebase Hosting / Vite proxy | `/v1` |
 
-The backend developer supplies the real deployed base URL. Public API calls need no Firebase SDK, API key or admin cookie. Add the public site's exact origin to backend `ALLOWED_ORIGINS`. Do not expose admin credentials in public JavaScript.
+Use the absolute deployed API URL on the public Jekyll site. The public invitation domain (`https://wpvlhc-gala-2026.ivory-gy.com`) serves the Jekyll pages; it does not serve `/v1` API routes. The relative `/v1` base works on the Firebase management host and through the local Vite proxy. Public API calls need no Firebase SDK, API key or admin cookie. Add the public site's exact origin to backend `ALLOWED_ORIGINS`. Do not expose admin credentials in public JavaScript.
 
 ## Personal invitation flow
 
 1. Management creates a church, then a named person through `POST /admin/guests`. The server generates their code and `uniqueUrl`, for example `https://public-site.example/gala/?token=a1b2c3d4e5f678901234567`.
 2. The public page reads **`token`** from the query string and calls `GET /token/{token}`. Use returned `personalizedName` for the greeting and `name` for the person's full name. Render names/notes with `textContent`, not HTML.
-3. Fetch `GET /food-items` for current menu IDs, labels, descriptions and units. Restore any existing selections from the invitation's `items` array. Previously selected inactive items may be absent from the catalogue; the invitation includes their name/unit so they can still be shown.
+3. Fetch `GET /food-items` for current menu IDs, labels, descriptions and units. Each record is a single-person slot; repeated names have different IDs and must be rendered separately. Claimed slots disappear from this list, including the guest's own slots. Restore saved selections from the invitation's `items` array, which includes their name/unit.
 4. On an attending reply, submit `POST /token/{token}/reply` with `rsvp:"yes"` and the complete food choices. The guest may bring nothing: `items:[]` is valid.
 5. On a declined reply, submit immediately with `rsvp:"no", items:[]`. The current public UI hides the food form on decline, so **do not wait for that form's submit button** to save the declined response.
 6. Show success only after a successful HTTP response. Disable submission while saving; show server errors and permit retry. A repeat submission replaces choices without duplicate contributions. Reloading the invitation restores the latest saved state.
@@ -31,10 +32,10 @@ For missing/malformed codes, display an invitation-link message and do not submi
 
 | Method | Path | Success |
 | --- | --- | --- |
-| GET | `/ready` | 200, liveness only |
+| GET | `/ready` | 200, liveness only; no cross-origin browser access |
 | GET | `/token/{token}/status` | 200, name/greeting, `valid:true`, saved RSVP and response timestamp |
 | GET | `/token/{token}` | 200, person, church, RSVP and saved food choices |
-| GET | `/food-items` | 200, `{foodItems:[{id,name,description,unit}]}`; available options only |
+| GET | `/food-items` | 200, `{foodItems:[{id,name,description,unit}]}`; active, unclaimed slots only |
 | POST | `/token/{token}/reply` | 200, saved `{token,rsvp,items}` |
 
 Invitation response example:
@@ -58,8 +59,8 @@ Reply payload:
 {
   "rsvp": "yes",
   "items": [
-    {"foodItemId": "food-07", "quantity": 12, "notes": "Vegetarian"},
-    {"foodItemId": "food-11", "quantity": 20, "notes": ""}
+    {"foodItemId": "gala-food-034", "quantity": 12, "notes": "Vegetarian"},
+    {"foodItemId": "gala-food-136", "quantity": 20, "notes": ""}
   ]
 }
 ```
@@ -68,8 +69,11 @@ Rules: `rsvp` is exactly `yes` or `no`; `items` is required even when empty; at 
 
 Existing inactive options may be retained at the same/lower quantity or removed; increasing or newly adding one returns 409. Refresh the catalogue and invite state after 409, and preserve unsaved input so the guest can resolve the change. The unit means what management configured for that item; do not assume every item is measured in servings.
 
+One slot can belong to only one person. For example, Baked chicken appears three times as `gala-food-001`, `gala-food-002` and `gala-food-003`, allowing up to three separate contributors. `quantity` is the amount that person brings, not the number of people permitted to claim a slot. Concurrent claims for the same ID produce one success and `409 FOOD_ITEM_TAKEN` for the other request. Refresh available slots and ask the guest to choose another. Removing a selection or declining releases it; repeat saves by the owner retain it. Request and response shapes are unchanged.
+
 ```js
-const API = "http://127.0.0.1:5001/demo-wpvlhc/us-central1/api/v1";
+const API = "https://wpvlhc-aog-2026.web.app/v1";
+// Local: http://127.0.0.1:5001/demo-wpvlhc/us-central1/api/v1
 const token = new URL(window.location.href).searchParams.get("token");
 
 async function publicApi(path, body) {
@@ -104,12 +108,18 @@ document.querySelectorAll("[data-invitee]").forEach((node) => {
 });
 // Render menu.foodItems and restore invitation.items using IDs.
 
-// Convert a quantity input using Number(input.value) before building this object.
-await publicApi(`/token/${encodeURIComponent(token)}/reply`, {
-  rsvp: "yes",
-  items: [{foodItemId: "food-07", quantity: 12, notes: "Vegetarian"}],
-});
-// Declining: await publicApi(`/token/${encodeURIComponent(token)}/reply`, {rsvp:"no", items:[]});
+// Call this only from the guest's reply/save event handler.
+// Convert quantity inputs using Number(input.value) when building selections.
+async function saveReply(rsvp, selections = []) {
+  return publicApi(`/token/${encodeURIComponent(token)}/reply`, {
+    rsvp,
+    items: rsvp === "no" ? [] : selections.map(({foodItemId, quantity, notes}) => ({
+      foodItemId, quantity, notes: (notes ?? "").trim(),
+    })),
+  });
+}
+// From the save handler: await saveReply("yes", selectedItems);
+// From the decline handler: await saveReply("no");
 ```
 
 The example uses top-level await: use it in an ES module or wrap it in your initialization function. The current deferred classic `site.js` needs the latter or a script type change.
@@ -154,6 +164,8 @@ Guest pagination defaults to 50, maximum 100. Results include active/inactive gu
 
 IDs and URLs are server-generated and immutable. New/reassigned guests require an active church. Set `active:false` to deactivate; deletion endpoints are intentionally absent. Inactive guest links return 410; reports exclude them until reactivated. Inactive church/food records keep history. Once a food item has received any contribution, changing its unit returns 409; create a new item for a different unit.
 
+Deactivating a guest retains their food reservations. To also free those slots, record a declined reply or an empty food selection through the admin reply endpoint. The admin food list includes `claimedBy` (the owning guest code, or null); public food responses never expose it.
+
 Reports accept optional `?churchId=<id>` and reflect a consistent snapshot of active invitations. `yes`, `no` and `pending` add up to `invited`; `contributors` counts attending people with at least one food item. Food totals are per item/unit, never summed across unrelated units. `contributions` lists each person/item once. Church reassignment moves the person's report entries automatically. CSVs contain a UTF-8 BOM/CRLF, escaped cells and formula neutralization.
 
 ## Errors and limits
@@ -179,7 +191,7 @@ Errors use one envelope:
 | 401 | Admin sign-in required or credentials wrong; prompt sign-in |
 | 403 | Browser origin blocked or management mutation header missing |
 | 404 | Invitation/record not found |
-| 409 | Inactive food/church or locked food unit; refresh and resolve |
+| 409 | Slot already taken (`FOOD_ITEM_TAKEN`), inactive food/church or locked unit; refresh and resolve |
 | 410 | Invitation disabled; show church contact message |
 | 413 | Request body over 32 KB |
 | 415 | Send `Content-Type: application/json` |

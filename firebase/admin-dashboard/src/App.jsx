@@ -419,6 +419,7 @@ function ReplyEditor({ guest, foods, onClose, onSave }) {
                   .filter(
                     (food) =>
                       food.active &&
+                      (!food.claimedBy || food.claimedBy === guest.id) &&
                       !items.some((item) => item.foodItemId === food.id),
                   )
                   .map((food) => (
@@ -962,7 +963,13 @@ export default function App() {
                         </small>
                       </td>
                       <td>{food.unit}</td>
-                      <td>{food.active ? "Available" : "Inactive"}</td>
+                      <td>
+                        {food.active
+                          ? food.claimedBy
+                            ? "Taken"
+                            : "Available"
+                          : "Inactive"}
+                      </td>
                       <td>
                         <button
                           className="quiet"

@@ -79,13 +79,25 @@ function createService(db, config) {
       const guest = requireRecord(guestDoc, "Invitation");
       if (!admin) assertActive(guest);
       const previous = previousDoc.data()?.items || [];
-      const foodDocs = payload.items.length
-        ? await tx.getAll(
-            ...payload.items.map((item) => foods.doc(item.foodItemId)),
-          )
+      const selectedIds = new Set(payload.items.map((item) => item.foodItemId));
+      const affectedIds = [
+        ...new Set([
+          ...selectedIds,
+          ...previous.map((item) => item.foodItemId),
+        ]),
+      ];
+      const foodDocs = affectedIds.length
+        ? await tx.getAll(...affectedIds.map((id) => foods.doc(id)))
         : [];
-      const items = payload.items.map((item, index) => {
-        const food = requireRecord(foodDocs[index], "Food item");
+      const foodMap = new Map(foodDocs.map((doc) => [doc.id, doc]));
+      const items = payload.items.map((item) => {
+        const food = requireRecord(foodMap.get(item.foodItemId), "Food item");
+        if (food.claimedBy && food.claimedBy !== token)
+          throw new ApiError(
+            409,
+            "FOOD_ITEM_TAKEN",
+            `The “${food.name}” slot has already been selected. Please choose another slot.`,
+          );
         const held =
           previous.find((row) => row.foodItemId === item.foodItemId)
             ?.quantity || 0;
@@ -105,8 +117,13 @@ function createService(db, config) {
       });
       // One contribution document per guest. Repeated submissions replace rather than append.
       tx.set(contributionRef, { guestId: token, items, updatedAt: now });
-      for (const doc of foodDocs)
-        tx.update(doc.ref, { hasContributions: true });
+      for (const doc of foodDocs) {
+        if (selectedIds.has(doc.id)) {
+          tx.update(doc.ref, { hasContributions: true, claimedBy: token });
+        } else if (doc.exists && doc.data().claimedBy === token) {
+          tx.update(doc.ref, { claimedBy: null });
+        }
+      }
       return { token, rsvp: payload.rsvp, items };
     });
   }
@@ -172,6 +189,7 @@ function createService(db, config) {
     ).get();
     return snapshot.docs
       .map(record)
+      .filter((item) => !publicOnly || !item.claimedBy)
       .sort((a, b) => a.name.localeCompare(b.name));
   }
   async function create(collection, payload) {
@@ -179,7 +197,9 @@ function createService(db, config) {
     const now = FieldValue.serverTimestamp();
     await ref.create({
       ...payload,
-      ...(collection.id === "FoodItems" ? { hasContributions: false } : {}),
+      ...(collection.id === "FoodItems"
+        ? { hasContributions: false, claimedBy: null }
+        : {}),
       createdAt: now,
       updatedAt: now,
     });

@@ -42,14 +42,16 @@ The `demo-wpvlhc` project is deliberately used locally. It cannot reach a live F
 | React development server | `http://127.0.0.1:5173` |
 | Public Jekyll site | `http://localhost:3000` |
 
-In a second terminal, seed the initial church and the 12 menu items already in `_data/food_items.yml`:
+In a second terminal, seed the church, 200 sample members and 150 Guyanese food/drink slots:
 
 ```sh
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm --prefix firebase run seed
 npm run admin:dev
 ```
 
-Sign in with `ADMIN_USERNAME` from `.env.local` (example: `churchadmin`) and the password you hashed. Create an invitation and copy its generated link. Seeding creates no people or fake RSVPs and preserves every existing record if rerun. Seed food IDs are `food-01` through `food-12`; the initial unit is `servings`, which management can adjust before an item receives its first contribution.
+Sign in with `ADMIN_USERNAME` from `.env.local` (example: `churchadmin`) and the password you hashed. The sample members have random personal invitation codes and pending RSVPs; rename them to real members before distributing links. Names and menu definitions are in `scripts/seed-data.cjs`. The menu has 50 dishes/drinks, each listed three times with separate IDs (`gala-food-001` through `gala-food-150`). For example, three Baked chicken records allow three people to reserve one slot each. Quantities still specify how many servings, pieces, slices or bottles that person will bring.
+
+Preview without credentials or database writes: `npm --prefix firebase run seed -- --dry-run`. Rerunning the actual seed preserves existing names, codes, replies and food commitments; it only creates missing seed records. Previously created records, including the old 12-item menu, are left intact and can be deactivated in management. The private `SeedData/gala-2026-members` document retains generated member codes so retries never duplicate the 200 sample invitations.
 
 Emulator data is temporary unless you use Firebase CLI `--export-on-exit` / `--import`. Keep data exports outside the public Jekyll output and source control.
 
@@ -72,13 +74,16 @@ Credentials, PUBLIC_SITE_URL and ALLOWED_ORIGINS are required. Production URLs m
 | --- | --- | --- |
 | `Churches` | Server ID; seed: `wpvlhc-aog` | `name`, `active`, `createdAt`, `updatedAt` |
 | `InvitedGuests` | Server-generated 24-character lowercase hexadecimal invitation code | `name`, `personalizedName`, `churchId`, `active`, `rsvp` (`pending`, `yes`, `no`), `respondedAt`, `createdAt`, `updatedAt` |
-| `FoodItems` | Server ID; seeds: `food-01` etc. | `name`, `description`, `unit`, `active`, `hasContributions`, `createdAt`, `updatedAt` |
+| `FoodItems` | Server ID; seeds: `gala-food-001` etc. | `name`, `description`, `unit`, `active`, `hasContributions`, `claimedBy` (guest code or null), `createdAt`, `updatedAt` |
 | `FoodContributions` | Same code as the person | `guestId`, `items: [{foodItemId, name, unit, quantity, notes}]`, `updatedAt` |
 | `RateLimits` | SHA-256 digest of a limit key | `count`, `expiresAt` (TTL field) |
+| `SeedData` | `gala-2026-members` | Private `memberTokens` array for repeatable sample seeding |
 
 Timestamps are Firestore server timestamps internally and ISO 8601 UTC strings in JSON. `token` and `uniqueUrl` are derived response fields; clients cannot choose them. Query tokens are bearer credentials for the person's RSVP. Do not log full invitation URLs or send them to analytics. The public layout includes a no-referrer policy.
 
 RSVP and contributions are replaced in one transaction. Declining requires an empty `items` array; an attending person may also bring nothing. A person may select at most 30 distinct items, with integer quantities of 1–10,000 and notes of at most 500 characters per item. An item's unit is permanently locked after its first contribution, preventing mixed-unit reports. Inactive items may remain in an existing commitment at the same/reduced quantity.
+
+Each food record is a single-person slot. Reserving it atomically removes it from the public menu; another person receives `409 FOOD_ITEM_TAKEN`. Removing it from a reply or declining releases it. Owners can revise their quantities without reserving it twice. Deactivating an invitation retains its recorded commitments; clear its reply if you also want to release the slots.
 
 Use `PATCH {"active":false}` instead of deletion. Inactive guests return 410 publicly and are excluded from reports; reactivation restores their recorded responses/contributions. Inactive churches keep existing invitations and reports but cannot receive new or reassigned guests. Inactive food options disappear from the public catalogue and retain commitments. Management can correct responses on inactive guest records.
 
@@ -105,17 +110,19 @@ The integration runner starts an isolated Firestore emulator with these rules an
 
 ## Production deployment
 
-1. Select your Firebase project with a Firestore database and billing enabled for Functions. Choose the database location deliberately; no production project is embedded here.
+1. Confirm your Firebase project has a Firestore database and billing enabled for Functions. This event uses `wpvlhc-aog-2026`; pass your intended project explicitly when deploying or seeding.
 2. From `firebase/`, run `npx firebase login`, then `npx firebase use --add` to select your project as default. Alternatively pass `--project <project-id>` explicitly.
 3. Create `functions/.env.<project-id>` with real `ADMIN_USERNAME`, `PUBLIC_SITE_URL`, HTTPS `ALLOWED_ORIGINS`, and `LOCAL_DEVELOPMENT=false`. Include both the admin Hosting and public Jekyll origins. Keep local settings in `.env.local`.
-4. Set secrets interactively, from `firebase/`:
+4. Set secrets interactively, from `firebase/`. Run each command individually:
 
    ```sh
-   npx firebase functions:secrets:set ADMIN_PASSWORD_HASH --project <project-id>
-   npx firebase functions:secrets:set ADMIN_JWT_SECRET --project <project-id>
+   npm --prefix functions run password:hash
+   npx firebase functions:secrets:set ADMIN_PASSWORD_HASH --project wpvlhc-aog-2026
+   node -e 'console.log(require("node:crypto").randomBytes(48).toString("hex"))'
+   npx firebase functions:secrets:set ADMIN_JWT_SECRET --project wpvlhc-aog-2026
    ```
 
-   Generate the hash with `npm --prefix functions run password:hash`. No plaintext password belongs in environment files.
+   Enter your chosen admin password in the hash helper, then paste only its complete `$2b$...` output at the `ADMIN_PASSWORD_HASH` prompt. Paste the generated random string at the `ADMIN_JWT_SECRET` prompt; it must contain at least 32 bytes. Use the original chosen password in the login form. Secret changes take effect after redeploying the function. No plaintext password belongs in environment files.
 
 5. From `firebase/`, run `npm run deploy -- --project <project-id>`. It validates the spec, runs backend unit tests, builds the dashboard, then deploys functions, rules/indexes and admin Hosting. Run integration tests separately before deploying.
 6. With Google Application Default Credentials configured, seed missing records explicitly from the repository root:
@@ -123,6 +130,8 @@ The integration runner starts an isolated Firestore emulator with these rules an
    ```sh
    npm --prefix firebase run seed -- --production --project <project-id>
    ```
+
+   If your terminal is already inside `firebase/`, use `npm run seed -- --production --project wpvlhc-aog-2026` instead. For local production seeding, first run `gcloud auth application-default login` with an account that can access the project.
 
    The script refuses live writes without explicit production intent and a real project ID. `firebase login` alone does not configure Node's Application Default Credentials. Existing records are preserved. Never place credentials in the public site.
 

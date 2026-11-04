@@ -290,6 +290,98 @@ test("admin replies, pagination, church reassignment, reports, CSV and disabling
   }).expect(409);
 });
 
+test("duplicate dish slots allow one person each and release atomically", async () => {
+  const people = [];
+  const slots = [];
+  for (const name of ["Slot guest A", "Slot guest B"])
+    people.push(
+      (
+        await mutate("post", "/admin/guests", {
+          name,
+          churchId: church.id,
+        }).expect(201)
+      ).body,
+    );
+  for (let i = 0; i < 3; i += 1)
+    slots.push(
+      (
+        await mutate("post", "/admin/food-items", {
+          name: "Baked chicken",
+          unit: "servings",
+        }).expect(201)
+      ).body,
+    );
+  const payload = (foodItemId) => ({
+    rsvp: "yes",
+    items: [{ foodItemId, quantity: 12 }],
+  });
+  const replies = await Promise.all(
+    people.map((person) =>
+      request(app)
+        .post(`/v1/token/${person.token}/reply`)
+        .send(payload(slots[0].id)),
+    ),
+  );
+  assert.deepEqual(replies.map((reply) => reply.status).sort(), [200, 409]);
+  const winnerIndex = replies.findIndex((reply) => reply.status === 200);
+  const winner = people[winnerIndex];
+  const loser = people[1 - winnerIndex];
+  assert.equal(replies[1 - winnerIndex].body.error.code, "FOOD_ITEM_TAKEN");
+  assert.equal(
+    (await request(app).get(`/v1/token/${loser.token}`)).body.rsvp,
+    "pending",
+  );
+  let available = (await request(app).get("/v1/food-items")).body.foodItems;
+  assert.equal(
+    available.filter((item) => item.name === "Baked chicken").length,
+    2,
+  );
+  assert.ok(!available.some((item) => item.id === slots[0].id));
+  assert.ok(!available.some((item) => "claimedBy" in item));
+
+  // Switching choices returns the first slot while reserving the second.
+  await request(app)
+    .post(`/v1/token/${winner.token}/reply`)
+    .send(payload(slots[1].id))
+    .expect(200);
+  await request(app)
+    .post(`/v1/token/${loser.token}/reply`)
+    .send(payload(slots[0].id))
+    .expect(200);
+  await request(app)
+    .post(`/v1/token/${winner.token}/reply`)
+    .send(payload(slots[0].id))
+    .expect(409);
+  await mutate(
+    "post",
+    `/admin/guests/${winner.id}/reply`,
+    payload(slots[0].id),
+  ).expect(409);
+  assert.equal(
+    (await db.collection("FoodItems").doc(slots[1].id).get()).data().claimedBy,
+    winner.token,
+  );
+  assert.equal(
+    (await request(app).get(`/v1/token/${winner.token}`)).body.items[0]
+      .foodItemId,
+    slots[1].id,
+  );
+
+  await request(app)
+    .post(`/v1/token/${winner.token}/reply`)
+    .send({ rsvp: "no", items: [] })
+    .expect(200);
+  await request(app)
+    .post(`/v1/token/${loser.token}/reply`)
+    .send({ rsvp: "yes", items: [] })
+    .expect(200);
+  available = (await request(app).get("/v1/food-items")).body.foodItems;
+  assert.equal(
+    available.filter((item) => item.name === "Baked chicken").length,
+    3,
+  );
+});
+
 test("shared login rate limits, logout and default-deny Firestore rules", async () => {
   let limited = false;
   for (let i = 0; i < 12; i += 1) {
@@ -317,4 +409,58 @@ test("shared login rate limits, logout and default-deny Firestore rules", async 
     body: JSON.stringify({ fields: { name: { stringValue: "Bad" } } }),
   });
   assert.equal(write.status, 403);
+});
+
+test("seeding is repeatable and preserves member codes, edits and food claims", async () => {
+  const { seedDatabase } = require("../../scripts/seed.cjs");
+  const { memberNames, foodSlots } = require("../../scripts/seed-data.cjs");
+  assert.deepEqual(await seedDatabase(db), {
+    Churches: 1,
+    InvitedGuests: 200,
+    FoodItems: 150,
+  });
+  const stateRef = db.collection("SeedData").doc("gala-2026-members");
+  const tokens = (await stateRef.get()).data().memberTokens;
+  assert.equal(tokens.length, 200);
+  assert.equal(new Set(tokens).size, 200);
+  assert.ok(tokens.every((token) => /^[a-f0-9]{24}$/.test(token)));
+  const invitation = (
+    await request(app).get(`/v1/token/${tokens[0]}`).expect(200)
+  ).body;
+  assert.equal(invitation.name, memberNames[0]);
+  assert.equal(
+    (
+      await db
+        .collection("FoodItems")
+        .where("name", "==", "Baked chicken")
+        .get()
+    ).size,
+    6,
+  );
+  await request(app)
+    .post(`/v1/token/${tokens[0]}/reply`)
+    .send({
+      rsvp: "yes",
+      items: [{ foodItemId: foodSlots[0].id, quantity: 12 }],
+    })
+    .expect(200);
+  await db
+    .collection("InvitedGuests")
+    .doc(tokens[0])
+    .update({ name: "Member renamed in management" });
+  assert.deepEqual(await seedDatabase(db), {
+    Churches: 0,
+    InvitedGuests: 0,
+    FoodItems: 0,
+  });
+  assert.deepEqual((await stateRef.get()).data().memberTokens, tokens);
+  assert.equal(
+    (await db.collection("InvitedGuests").doc(tokens[0]).get()).data().name,
+    "Member renamed in management",
+  );
+  assert.equal(
+    (await db.collection("FoodItems").doc(foodSlots[0].id).get()).data()
+      .claimedBy,
+    tokens[0],
+  );
 });

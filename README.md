@@ -8,7 +8,7 @@ The public site remains Jekyll + Tailwind CSS. The backend and React management 
 
 ```text
 index.html, assets/, _includes/    Public Jekyll invitation site
-_data/food_items.yml              Initial menu used by the seed script
+_data/food_items.yml              Static public menu preview
 firebase/
   functions/                     Node.js 24, Express 5, Joi, Functions v2
   admin-dashboard/               React + Vite management app
@@ -81,4 +81,4 @@ Integration tests cover personal links, atomic updates, duplicate prevention, in
 
 ## Deployment
 
-See [Firebase deployment/data model](firebase/README.md) and the [admin README](firebase/admin-dashboard/README.md). Select your Firebase project, configure production URLs and set admin secrets before deployment. Firebase Hosting serves the **management app**; the public Jekyll site keeps its existing hosting. No production project is selected here.
+See [Firebase deployment/data model](firebase/README.md) and the [admin README](firebase/admin-dashboard/README.md). Confirm your target Firebase project, production URLs and admin secrets before deployment. Firebase Hosting serves the **management app**; the public Jekyll site keeps its existing hosting. The frontend handoff includes the deployed API URLs.
