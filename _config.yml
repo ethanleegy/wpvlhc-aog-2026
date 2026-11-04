@@ -23,6 +23,10 @@ plugins:
 exclude:
   - firebase
   - api-spec
+  - cloudflare
+  - shared
+  - gallery-client
+  - scripts
   - node_modules
   - package.json
   - package-lock.json

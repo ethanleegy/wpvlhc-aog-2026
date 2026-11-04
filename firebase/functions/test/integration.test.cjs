@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const { initializeApp, deleteApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { createApp } = require("../src/app");
+const { loadConfig } = require("../src/config");
 
 if (
   !process.env.FIRESTORE_EMULATOR_HOST ||
@@ -27,10 +28,10 @@ const mutate = (method, path, body, client = agent) =>
   client[method](`/v1${path}`).set("X-Admin-Request", "true").send(body);
 
 before(async () => {
-  firebaseApp = initializeApp({ projectId: process.env.GCLOUD_PROJECT });
+  firebaseApp = initializeApp({ projectId: `${process.env.GCLOUD_PROJECT}-integration` });
   db = getFirestore(firebaseApp);
   const response = await fetch(
-    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${process.env.GCLOUD_PROJECT}/databases/(default)/documents`,
+    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${firebaseApp.options.projectId}/databases/(default)/documents`,
     { method: "DELETE" },
   );
   assert.equal(response.status, 200);
@@ -129,6 +130,39 @@ test("church and food creation; personal links cannot be supplied or guessed fro
   await request(app).get("/v1/token/Pat%20Example").expect(400);
   await request(app).get("/v1/token/%E0%A4%A").expect(400);
   await request(app).get("/v1/token/aaaaaaaaaaaaaaaaaaaaaaaa").expect(404);
+});
+
+test("production invitation status works with explicitly allowed HTTP localhost origins", async () => {
+  const env = {
+    ADMIN_USERNAME: config.username,
+    ADMIN_PASSWORD_HASH: config.passwordHash,
+    ADMIN_JWT_SECRET: config.jwtSecret,
+    PUBLIC_SITE_URL: "https://example.org/",
+    ALLOWED_ORIGINS:
+      "https://admin.example.org,http://localhost:3000,http://127.0.0.1:3000",
+  };
+  const productionApp = createApp({
+    getDb: () => db,
+    getConfig: () => loadConfig(env),
+    logger: { error() {} },
+  });
+  for (const origin of ["http://localhost:3000", "http://127.0.0.1:3000"]) {
+    const response = await request(productionApp)
+      .get(`/v1/token/${guest.token}/status`)
+      .set("Origin", origin)
+      .expect(200);
+    assert.equal(response.body.valid, true);
+    assert.equal(response.body.rsvp, "pending");
+    assert.equal(response.headers["access-control-allow-origin"], origin);
+  }
+  await request(productionApp)
+    .get(`/v1/token/${guest.token}/status`)
+    .set("Origin", "http://localhost.evil.example:3000")
+    .expect(403);
+  await request(productionApp)
+    .get("/v1/admin/session")
+    .set("Origin", "http://localhost:3000")
+    .expect(401);
 });
 
 test("replies are atomic, replace choices, reject invalid foods and retain locked units", async () => {
@@ -400,7 +434,7 @@ test("shared login rate limits, logout and default-deny Firestore rules", async 
   assert.equal(limited, true);
   await mutate("post", "/admin/logout", {}).expect(204);
   await agent.get("/v1/admin/session").expect(401);
-  const base = `http://${process.env.FIRESTORE_EMULATOR_HOST}/v1/projects/${process.env.GCLOUD_PROJECT}/databases/(default)/documents`;
+  const base = `http://${process.env.FIRESTORE_EMULATOR_HOST}/v1/projects/${firebaseApp.options.projectId}/databases/(default)/documents`;
   const read = await fetch(`${base}/InvitedGuests/${guest.id}`);
   assert.equal(read.status, 403);
   const write = await fetch(`${base}/FoodItems/unauthorized`, {

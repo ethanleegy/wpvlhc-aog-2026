@@ -4,12 +4,135 @@
       "collectionGroup": "InvitedGuests",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "churchId", "order": "ASCENDING" },
-        { "fieldPath": "rsvp", "order": "ASCENDING" }
+        {
+          "fieldPath": "churchId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "rsvp",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "Photos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "uploadState",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "reviewState",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "deliveryState",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "Photos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "reviewState",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "deliveryState",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "Photos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "batchId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "reviewState",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "deliveryState",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "Photos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "batchId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "reviewState",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "Photos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "batchId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "uploadState",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "Photos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "needsReconcile",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "uploadState",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],
   "fieldOverrides": [
-    { "collectionGroup": "RateLimits", "fieldPath": "expiresAt", "ttl": true, "indexes": [] }
+    {
+      "collectionGroup": "RateLimits",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "Photos",
+      "fieldPath": "expected",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "Photos",
+      "fieldPath": "attempts",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "Photos",
+      "fieldPath": "lease",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "Photos",
+      "fieldPath": "claimed",
+      "indexes": []
+    }
   ]
 }

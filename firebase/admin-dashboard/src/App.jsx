@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { allGuests, api, downloadReport } from "./api.js";
+import Gallery from "./Gallery.jsx";
 
 const tabs = [
   ["overview", "Overview"],
@@ -7,6 +8,7 @@ const tabs = [
   ["food", "Food & drinks"],
   ["churches", "Churches"],
   ["contributions", "Contributions"],
+  ["gallery", "Photo gallery"],
 ];
 const statusText = {
   yes: "Attending",
@@ -634,7 +636,9 @@ export default function App() {
                     ? "Keep the shared table organised, one contribution at a time."
                     : tab === "churches"
                       ? "Bring every congregation into the celebration."
-                      : "See who is bringing what, with quantities and notes."}
+                      : tab === "gallery"
+                        ? "Share the memories, add your collection, and manage photo visibility."
+                        : "See who is bringing what, with quantities and notes."}
             </p>
           </div>
           <button className="secondary" onClick={load} disabled={busy}>
@@ -651,7 +655,7 @@ export default function App() {
             {notice}
           </p>
         )}
-        {!data ? (
+        {tab === "gallery" ? <Gallery /> : !data ? (
           <Empty>
             {busy
               ? "Loading the evening's details…"

@@ -19,3 +19,8 @@ service-account*.json
 coverage/
 playwright-report/
 test-results/
+.wrangler/
+.dev.vars
+.dev.vars.*
+assets/gallery/
+.gallery-local/

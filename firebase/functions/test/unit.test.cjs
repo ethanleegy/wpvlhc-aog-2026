@@ -169,7 +169,46 @@ test("production has no default credentials or insecure cookie mode", () => {
     /requires Firestore emulation/,
   );
   assert.throws(
-    () => loadConfig({ ...env, ALLOWED_ORIGINS: "http://localhost:5173" }),
+    () => loadConfig({ ...env, ALLOWED_ORIGINS: "http://admin.example.org" }),
     /HTTPS/,
+  );
+});
+
+test("production allows explicit HTTP loopback origins without enabling local cookie mode", () => {
+  const origins = [
+    "https://admin.example.org",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://[::1]:3000",
+  ];
+  const env = {
+    ADMIN_USERNAME: "admin",
+    ADMIN_PASSWORD_HASH: bcrypt.hashSync("unit-test-only", 4),
+    ADMIN_JWT_SECRET: "x".repeat(40),
+    PUBLIC_SITE_URL: "https://example.org/gala/",
+    ALLOWED_ORIGINS: origins.join(","),
+  };
+  const config = loadConfig(env);
+  assert.deepEqual(config.origins, origins);
+  assert.equal(config.local, false);
+  assert.equal(require("../src/auth").cookieOptions(config).secure, true);
+  for (const origin of [
+    "http://admin.example.org",
+    "http://localhost.evil.example:3000",
+    "http://127.0.0.1.evil.example:3000",
+    "http://192.168.1.1:3000",
+  ]) {
+    assert.throws(
+      () => loadConfig({ ...env, ALLOWED_ORIGINS: origin }),
+      /HTTPS/,
+    );
+  }
+  assert.throws(
+    () => loadConfig({ ...env, PUBLIC_SITE_URL: "http://localhost:3000/" }),
+    /HTTPS/,
+  );
+  assert.throws(
+    () => loadConfig({ ...env, ALLOWED_ORIGINS: "http://localhost:3000/" }),
+    /exact origins/,
   );
 });

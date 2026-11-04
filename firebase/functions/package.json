@@ -8,8 +8,8 @@
     "node": "24"
   },
   "scripts": {
-    "test": "node --test test/unit.test.cjs",
-    "test:integration": "node --test --test-concurrency=1 test/integration.test.cjs",
+    "test": "node --test test/unit.test.cjs test/gallery-unit.test.cjs",
+    "test:integration": "node --test --test-concurrency=1 test/integration.test.cjs test/gallery-integration.test.cjs",
     "start": "node --env-file-if-exists=.env.local src/dev.js",
     "password:hash": "node scripts/password-hash.cjs"
   },

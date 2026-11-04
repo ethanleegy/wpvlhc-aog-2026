@@ -653,3 +653,28 @@ td strong {
     overflow: visible;
   }
 }
+:root { --gallery-green: #234536; }
+.gallery-management { display: grid; gap: 24px; }
+.gallery-settings { display: flex; justify-content: space-between; gap: 24px; padding: 24px; }
+.gallery-toggle { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+.gallery-toggle input, .gallery-selection input { width: auto; accent-color: var(--gallery-green); }
+.gallery-qr { display: grid; justify-items: center; align-content: start; gap: 8px; min-width: 180px; }
+.gallery-qr img { max-width: 100%; }
+.gallery-upload { padding: 24px; }
+.gallery-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.gallery-controls label { display: grid; gap: 6px; }
+.gallery-controls input[type=file] { max-width: 100%; width: 300px; }
+.gallery-upload progress { width: 100%; height: 12px; accent-color: var(--gallery-green); }
+.gallery-queue { list-style: none; padding: 0; margin: 16px 0; }
+.gallery-queue li { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #ddd; overflow-wrap: anywhere; }
+.gallery-queue strong { flex: 1; }
+.gallery-review-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(210px,1fr)); gap: 16px; }
+.gallery-photo-card { background: white; border: 1px solid #e3e5dd; border-radius: 12px; overflow: hidden; min-width: 0; }
+.gallery-photo-card p, .gallery-selection { padding: 12px; margin: 0; overflow-wrap: anywhere; }
+.gallery-selection { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.gallery-photo-preview { display: block; padding: 0; border: 0; width: 100%; background: #eee; border-radius: 0; }
+.gallery-photo-preview img { width: 100%; height: 210px; object-fit: cover; display: block; }
+.gallery-photo-placeholder { display: grid; place-items: center; background: #f1f2ed; height: 210px; }
+.gallery-lightbox { position: fixed; inset: 0; z-index: 50; background: #17221def; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 24px; }
+.gallery-lightbox img { max-width: 100%; max-height: 80vh; object-fit: contain; }
+@media(max-width:650px) { .gallery-settings { flex-direction: column; } .gallery-upload, .gallery-settings { padding: 16px; } .gallery-review-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .gallery-photo-preview img { height: 160px; } .gallery-controls > button { flex: 1; } }

@@ -13,6 +13,12 @@ exports.api = onRequest(
     secrets: [
       defineSecret("ADMIN_PASSWORD_HASH"),
       defineSecret("ADMIN_JWT_SECRET"),
+      ...(process.env.GALLERY_ENABLED === "true" ? [
+        defineSecret("GALLERY_TICKET_SECRET"),
+        defineSecret("GALLERY_INTERNAL_SECRET"),
+        defineSecret("GALLERY_CLAIM_SECRET"),
+        defineSecret("GALLERY_TURNSTILE_SECRET"),
+      ] : []),
     ],
   },
   createApp({ getDb, getConfig: loadConfig }),

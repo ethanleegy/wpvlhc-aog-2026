@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wpvlhc-gala-gallery",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:5174",
+    "API_BASE": "http://127.0.0.1:5999/v1",
+    "COST_APPROVAL_EXPIRES_AT": ""
+  },
+  "r2_buckets": [
+    { "binding": "PRIVATE", "bucket_name": "wpvlhc-gala-2026-private", "remote": false },
+    { "binding": "PUBLISHED", "bucket_name": "wpvlhc-gala-2026-published", "remote": false }
+  ]
+}

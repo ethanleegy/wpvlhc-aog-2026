@@ -14,7 +14,7 @@ const {
 } = require("./auth");
 const { guestCsv, foodCsv } = require("./csv");
 
-function createApp({ getDb, getConfig, logger = console }) {
+function createApp({ getDb, getConfig, logger = console, galleryStorageFactory }) {
   const app = express();
   app.disable("x-powered-by");
   // Cloud Functions supplies req.ip through Express; never trust arbitrary forwarded IPs.
@@ -248,6 +248,7 @@ function createApp({ getDb, getConfig, logger = console }) {
       },
     );
   }
+  require("./gallery-routes").galleryRoutes(api, admin, { getDb, storageFactory: galleryStorageFactory });
   api.use("/admin", admin);
   app.use("/v1", api);
   app.use((req, res, next) =>

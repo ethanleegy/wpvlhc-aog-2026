@@ -1,3 +1,4 @@
+const { loadGalleryConfig } = require("./gallery-config");
 function loadConfig(env = process.env) {
   const local = env.LOCAL_DEVELOPMENT === "true";
   const emulator =
@@ -24,7 +25,7 @@ function loadConfig(env = process.env) {
     .filter(Boolean);
   if (!origins.length)
     throw new Error("ALLOWED_ORIGINS must include at least one origin");
-  for (const value of [site.href, ...origins]) {
+  for (const [index, value] of [site.href, ...origins].entries()) {
     const url = new URL(value);
     if (
       url.username ||
@@ -32,7 +33,11 @@ function loadConfig(env = process.env) {
       !["http:", "https:"].includes(url.protocol)
     )
       throw new Error("Invalid configured URL");
-    if (!local && url.protocol !== "https:")
+    // HTTP loopback is permitted only in explicit CORS entries, never siteUrl.
+    const loopbackOrigin =
+      index > 0 &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (!local && url.protocol !== "https:" && !loopbackOrigin)
       throw new Error("Production URLs must use HTTPS");
   }
   if (!origins.every((origin) => new URL(origin).origin === origin))
@@ -46,6 +51,7 @@ function loadConfig(env = process.env) {
     jwtSecret: env.ADMIN_JWT_SECRET,
     siteUrl: site.href,
     origins,
+    gallery: loadGalleryConfig(env, local),
   };
 }
 module.exports = { loadConfig };
