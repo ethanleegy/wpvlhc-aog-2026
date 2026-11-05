@@ -27,6 +27,9 @@ exclude:
   - shared
   - gallery-client
   - scripts
+  - output
+  - tmp
+  - test-results
   - node_modules
   - package.json
   - package-lock.json

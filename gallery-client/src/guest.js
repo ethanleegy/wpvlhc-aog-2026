@@ -1,11 +1,21 @@
 import "./guest.css";
 import { createGalleryApi, GalleryQueue } from "./queue.js";
+import { createGuestSession } from "./guest-session.js";
 
 const root = document.querySelector("#gallery-app");
 const local = ["localhost", "127.0.0.1"].includes(location.hostname);
 const base = root.dataset.apiBase || (local ? "http://127.0.0.1:5999/v1" : "https://wpvlhc-aog-2026.web.app/v1");
 const api = createGalleryApi({ base });
-let policy, queue, sessionToken = "", verification = "", widget;
+let policy, queue, verification = "", widget;
+const session = createGuestSession({ api, getVerification: () => verification });
+async function getSessionToken(options) {
+  try { return await session(options); }
+  catch (error) {
+    verification = "";
+    if (widget !== undefined) window.turnstile?.reset(widget);
+    throw error;
+  }
+}
 const make = (tag, text, className) => { const element = document.createElement(tag); if (text) element.textContent = text; if (className) element.className = className; return element; };
 root.append(make("p", "WPVLHC · ASSEMBLY OF GOD", "eyebrow"), make("h1", "Share the evening."), make("p", "A room full of memories. Add yours to the Christmas Gala.", "intro"));
 const controls = make("section", "", "share-card"), actions = make("div", "", "choose-actions");
@@ -88,26 +98,12 @@ for (const input of [camera, picker]) input.onchange = async () => {
   if (input.files.length > 20) { progress.textContent = "Choose up to 20 photos at a time."; input.value = ""; return; }
   if (queue) { queue.add([...input.files]); input.value = ""; await queue.preparePreviews(); }
 };
-async function session() {
-  if (sessionToken) return;
-  try {
-    const saved = JSON.parse(localStorage.getItem("wpvlhc-gallery-session") || "null");
-    if (saved && Date.parse(saved.expiresAt) > Date.now()) { sessionToken = saved.sessionToken; return; }
-  } catch {}
-  const result = await api("/gallery/sessions", { turnstileToken: verification });
-  sessionToken = result.sessionToken;
-  try { localStorage.setItem("wpvlhc-gallery-session", JSON.stringify(result)); } catch {}
-}
-share.onclick = async () => {
-  share.disabled = true;
-  try { await session(); queue.sessionToken = sessionToken; await queue.start(); }
-  catch (error) { progress.textContent = error.message; share.disabled = false; if (widget !== undefined) window.turnstile?.reset(widget); }
-};
+share.onclick = () => queue.start();
 retry.onclick = () => queue.retryFailed(); pause.onclick = () => queue.paused ? queue.start() : queue.pause();
 window.addEventListener("beforeunload", event => { if (queue?.running) { event.preventDefault(); event.returnValue = ""; } });
 try {
   policy = await api("/gallery/policy");
-  queue = new GalleryQueue({ api, storageKey: `guest:${base}`, onChange: render }); await queue.restore();
+  queue = new GalleryQueue({ api, getSessionToken, storageKey: `guest:${base}`, onChange: render }); await queue.restore();
   if (policy.requireApproval) notice.textContent = "Photos will appear publicly after management approval. Originals stay on your device.";
   if (!policy.guestUploadsOpen) { cameraButton.disabled = true; chooseButton.disabled = true; progress.textContent = "Guest photo sharing is closed. You can still enjoy the gallery."; }
   else { cameraButton.disabled = false; chooseButton.disabled = false; progress.textContent = "Take a photo or choose a few favourites to get started."; }

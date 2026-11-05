@@ -37,8 +37,8 @@ async function restore(key) {
   finally { db.close(); }
 }
 export class GalleryQueue {
-  constructor({ api, admin = false, sessionToken = "", storageKey, onChange = () => {} }) {
-    Object.assign(this, { api, admin, sessionToken, storageKey, onChange });
+  constructor({ api, admin = false, sessionToken = "", getSessionToken, storageKey, onChange = () => {} }) {
+    Object.assign(this, { api, admin, sessionToken, getSessionToken, storageKey, onChange });
     this.rows = []; this.paused = true; this.running = false; this.publication = "follow";
   }
   async restore() {
@@ -167,8 +167,16 @@ export class GalleryQueue {
     if (!row.upload) {
       row.phase = "authorizing"; this.changed();
       row.descriptor = { itemId: row.itemId, fileName: row.fileName, thumbnail: descriptor(row.prepared.thumbnail), display: descriptor(row.prepared.display) };
-      const result = await this.api("/gallery/uploads", { requestId: row.requestId,
-        ...(this.admin ? { batchId: this.batchId } : { sessionToken: this.sessionToken }), files: [row.descriptor] });
+      const authorize = sessionToken => this.api("/gallery/uploads", { requestId: row.requestId,
+        ...(this.admin ? { batchId: this.batchId } : { sessionToken }), files: [row.descriptor] });
+      let token = !this.admin && this.getSessionToken ? await this.getSessionToken() : this.sessionToken;
+      let result;
+      try { result = await authorize(token); }
+      catch (error) {
+        if (this.admin || !this.getSessionToken || error.code !== "SESSION_EXPIRED") throw error;
+        token = await this.getSessionToken({ rejectedToken: token });
+        result = await authorize(token);
+      }
       row.upload = result.uploads[0]; this.changed();
     }
     row.phase = "uploading"; this.changed();

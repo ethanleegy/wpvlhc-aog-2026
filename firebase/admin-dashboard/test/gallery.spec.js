@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 const apiBase = "http://127.0.0.1:5999/v1";
+const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGMMqHBjwAaYsIoOWgkA1+YBHmKFY/QAAAAASUVORK5CYII=", "base64");
 test("device compression, automatic publication, bulk hide/show, prior approval and admin batch", async ({ browser, request }) => {
   const admin = await browser.newPage(); await admin.goto("http://127.0.0.1:5173/");
   await admin.getByLabel("Username", { exact: true }).fill("localadmin"); await admin.getByLabel("Password", { exact: true }).fill("local-gallery-only"); await admin.getByRole("button", { name: "Sign in →" }).click();
@@ -78,4 +79,56 @@ test("optional libheif sample converts on the uploading device", async ({ page }
   await expect(page.locator(".selection img")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByRole("button", { name: "Share photos", exact: true })).toBeEnabled();
   expect(await page.locator(".selection img").evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
+});
+
+test("guest retries a failed authorization after reload using its saved session", async ({ page, request }) => {
+  await request.post("http://127.0.0.1:5173/v1/admin/login", { headers: { "X-Admin-Request": "true" }, data: { username: "localadmin", password: "local-gallery-only" } });
+  const reset = await request.patch("http://127.0.0.1:5173/v1/admin/gallery/settings", { headers: { "X-Admin-Request": "true" }, data: { requireApproval: false, guestUploadsOpen: true } });
+  expect(reset.status()).toBe(200);
+  await page.route(`${apiBase}/gallery/uploads`, route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "TEST_OUTAGE", message: "Sharing temporarily interrupted" } }) }));
+  await page.goto("http://127.0.0.1:5174/");
+  await expect(page.getByRole("button", { name: "Choose photos", exact: true })).toBeEnabled();
+  await page.locator("input[type=file]").nth(1).setInputFiles({ name: "reload-retry.png", mimeType: "image/png", buffer: tinyPng });
+  await expect(page.getByRole("button", { name: "Share photos", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Share photos", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Retry failed photos", exact: true })).toBeVisible();
+  await page.waitForFunction(async () => {
+    const db = await new Promise((resolve, reject) => { const open = indexedDB.open("wpvlhc-gallery-queue-v1", 1); open.onsuccess = () => resolve(open.result); open.onerror = reject; });
+    try { return await new Promise(resolve => { const get = db.transaction("queues").objectStore("queues").get("guest:http://127.0.0.1:5999/v1"); get.onsuccess = () => resolve(get.result?.rows?.some(row => row.phase === "failed")); }); }
+    finally { db.close(); }
+  });
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("wpvlhc-gallery-session")));
+  await page.unroute(`${apiBase}/gallery/uploads`);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Retry failed photos", exact: true })).toBeVisible();
+  const authorization = page.waitForRequest(req => req.url() === `${apiBase}/gallery/uploads` && req.method() === "POST");
+  await page.getByRole("button", { name: "Retry failed photos", exact: true }).click();
+  expect((await authorization).postDataJSON().sessionToken).toBe(saved.sessionToken);
+  await expect(page.locator(".selection")).toContainText("In the gallery", { timeout: 45_000 });
+});
+
+test("admin refreshes expired thumbnails and bounds retries when storage stays unavailable", async ({ page }) => {
+  const ids = ["c".repeat(32), "d".repeat(32)], refreshes = new Map(), imageAttempts = [];
+  const photo = (id, fresh = false) => ({ id, fileName: `${id[0]}-expiry.jpg`, source: "guest", uploadState: "ready", reviewState: "approved", deliveryState: "published", desiredVisible: true,
+    thumbnailUrl: `http://127.0.0.1:8787/images/admin/${id}/initial/thumbnail?v=${fresh ? "fresh" : "expired"}` });
+  await page.route("**/v1/admin/gallery/photos?**", route => route.fulfill({ json: { photos: ids.map(id => photo(id)), nextCursor: null } }));
+  await page.route(/\/v1\/admin\/gallery\/photos\/[cd]{32}$/, route => {
+    const id = route.request().url().split("/").at(-1); refreshes.set(id, (refreshes.get(id) || 0) + 1);
+    return route.fulfill({ json: photo(id, true) });
+  });
+  await page.route("**/images/admin/**/initial/thumbnail?**", route => {
+    const url = new URL(route.request().url()), fresh = url.searchParams.get("v") === "fresh", id = url.pathname.split("/")[3];
+    imageAttempts.push({ id, fresh });
+    if (fresh && id === ids[0]) return route.fulfill({ contentType: "image/png", body: tinyPng });
+    return route.fulfill({ status: 403 });
+  });
+  await page.goto("http://127.0.0.1:5173/");
+  await page.getByLabel("Username", { exact: true }).fill("localadmin"); await page.getByLabel("Password", { exact: true }).fill("local-gallery-only");
+  await page.getByRole("button", { name: "Sign in →" }).click();
+  await page.getByRole("button", { name: "Photo gallery", exact: false }).click();
+  const recovered = page.getByRole("img", { name: "c-expiry.jpg", exact: true });
+  await expect(recovered).toHaveJSProperty("naturalWidth", 8);
+  await expect.poll(() => imageAttempts.filter(item => item.id === ids[1]).length).toBe(2);
+  await page.getByRole("img", { name: "d-expiry.jpg", exact: true }).evaluate(image => image.dispatchEvent(new Event("error")));
+  expect(refreshes.get(ids[0])).toBe(1); expect(refreshes.get(ids[1])).toBe(1);
 });

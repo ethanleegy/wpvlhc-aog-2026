@@ -15,6 +15,16 @@ export default function Gallery() {
   const [publication, setPublication] = useState("follow"), [qr, setQr] = useState("");
   const [preview, setPreview] = useState(null);
   const queue = useRef(null), picker = useRef(null), alive = useRef(true);
+  const thumbnailRefreshes = useRef(new Map());
+  async function refreshThumbnail(photo) {
+    const previous = thumbnailRefreshes.current.get(photo.id);
+    if (previous !== undefined && Date.now() - previous < 60_000) return;
+    thumbnailRefreshes.current.set(photo.id, Date.now());
+    try {
+      const latest = await api(`/gallery/photos/${photo.id}`);
+      if (alive.current) setPhotos(current => current.map(item => item.id === photo.id ? { ...item, thumbnailUrl: latest.thumbnailUrl } : item));
+    } catch (failure) { if (alive.current) setError(failure.message); }
+  }
   async function load(append = false) {
     setBusy(true); setError("");
     try {
@@ -119,7 +129,7 @@ export default function Gallery() {
       </div>
       <div className="gallery-review-grid">{photos.map(photo => <article className="gallery-photo-card" key={photo.id}>
         <label className="gallery-selection"><input type="checkbox" checked={selected.has(photo.id)} onChange={() => toggle(photo.id)} />Select {photo.fileName}</label>
-        {photo.thumbnailUrl ? <button className="gallery-photo-preview" onClick={() => perform(async () => setPreview(await api(`/gallery/photos/${photo.id}`)))} aria-label={`Preview ${photo.fileName}`}><img src={photo.thumbnailUrl} loading="lazy" alt={photo.fileName} /></button> : <div className="gallery-photo-placeholder">{photo.uploadState}</div>}
+        {photo.thumbnailUrl ? <button className="gallery-photo-preview" onClick={() => perform(async () => setPreview(await api(`/gallery/photos/${photo.id}`)))} aria-label={`Preview ${photo.fileName}`}><img src={photo.thumbnailUrl} loading="lazy" alt={photo.fileName} onError={() => refreshThumbnail(photo)} /></button> : <div className="gallery-photo-placeholder">{photo.uploadState}</div>}
         <p><strong>{photo.fileName}</strong><br /><span className="small muted">{photo.desiredVisible ? (photo.deliveryState === "published" ? "Visible" : "Publishing") : photo.reviewState === "pending" ? "Awaiting approval" : "Hidden"} · {photo.source === "admin" ? "Admin" : "Guest"}</span></p>
         {photo.error && <p className="error">{photo.error.replaceAll("_", " ").toLowerCase()}</p>}
       </article>)}</div>

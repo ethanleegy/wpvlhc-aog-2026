@@ -81,4 +81,6 @@ Integration tests cover personal links, atomic updates, duplicate prevention, in
 
 ## Deployment
 
+For the gallery, follow the [production deployment runbook](api-spec/PROD_DEPLOYMENT_README.md). It explains the components, the Cloudflare $0 checks, matching secrets, all three releases, live acceptance and monthly renewal. A [printable guide](output/pdf/Gallery_Deployment_and_Readiness_Guide.pdf) accompanies it.
+
 See [Firebase deployment/data model](firebase/README.md) and the [admin README](firebase/admin-dashboard/README.md). Confirm your target Firebase project, production URLs and admin secrets before deployment. Firebase Hosting serves the **management app**; the public Jekyll site keeps its existing hosting. The frontend handoff includes the deployed API URLs.

@@ -1,5 +1,7 @@
 # Firebase backend and management
 
+For the local gallery, see [the gallery client guide](../gallery-client/README.md). `npm run gallery:local` from the repository root starts isolated demo Firestore, the API, local R2/Worker, the guest uploader and management together. Gallery routes are disabled in existing deployments until explicitly configured; the Cloudflare $0 account review is a separate launch prerequisite.
+
 The gala uses Firebase Functions v2 (`api`, `us-central1`) with Node.js 24, Express 5, Joi, the Firestore Admin SDK, bcrypt and JWT cookie sessions. The management frontend is React + Vite in `admin-dashboard/`. Routes are under `/v1`; see [APISPECS](../api-spec/APISPECS.md) and [OpenAPI](../api-spec/openapi.json).
 
 The folder layout and versioned invitation endpoints follow the two reference applications. This application uses one person per code, permits response corrections, denies direct browser access to Firestore, and requires configured credentials without fallback passwords.
@@ -66,7 +68,7 @@ Emulator data is temporary unless you use Firebase CLI `--export-on-exit` / `--i
 | `ALLOWED_ORIGINS` | Comma-separated exact public/admin origins; include the admin Hosting origin |
 | `LOCAL_DEVELOPMENT` | `true` only with the emulator, enabling local non-Secure cookies; `false` in production |
 
-Credentials, PUBLIC_SITE_URL and ALLOWED_ORIGINS are required. Production URLs must use HTTPS. Origins cannot have paths, trailing slashes or wildcards. `PUBLIC_SITE_URL` cannot contain a query/fragment. Configuration is checked at request time so Firebase can discover exports before secret injection. `/v1/ready` checks liveness, not credentials/database readiness.
+Credentials, PUBLIC_SITE_URL and ALLOWED_ORIGINS are required. In production, `PUBLIC_SITE_URL` and non-loopback origins must use HTTPS. Explicitly listed HTTP origins on `localhost`, `127.0.0.1` or `[::1]` are allowed for frontend development; keep `LOCAL_DEVELOPMENT=false` so production cookies remain Secure. Origins cannot have paths, trailing slashes or wildcards. `PUBLIC_SITE_URL` cannot contain a query/fragment. Configuration is checked at request time so Firebase can discover exports before secret injection. `/v1/ready` checks liveness, not credentials/database readiness.
 
 ## Firestore model
 
@@ -109,6 +111,8 @@ npm --prefix firebase/admin-dashboard run build
 The integration runner starts an isolated Firestore emulator with these rules and runs HTTP tests against Express and the actual Firestore SDK. It refuses non-`demo-` projects, clears demo data, then shuts down. Run it separately from development emulators because they share ports.
 
 ## Production deployment
+
+For the gallery's full Cloudflare + Firebase + public-site sequence, use the [production deployment runbook](../api-spec/PROD_DEPLOYMENT_README.md). The steps below cover the existing backend and management deployment.
 
 1. Confirm your Firebase project has a Firestore database and billing enabled for Functions. This event uses `wpvlhc-aog-2026`; pass your intended project explicitly when deploying or seeding.
 2. From `firebase/`, run `npx firebase login`, then `npx firebase use --add` to select your project as default. Alternatively pass `--project <project-id>` explicitly.
