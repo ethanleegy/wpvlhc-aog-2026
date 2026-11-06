@@ -31,7 +31,7 @@ permalink: /
     <div class="mx-auto w-full max-w-[990px]">
       <div class="mx-auto max-w-[710px] text-center">
         <p class="mb-[19px] text-[10px] leading-[1.5] font-bold tracking-[.22em] text-red uppercase">A little note for you</p>
-        <h2 id="invitation-title" class="m-0 mb-[17px] font-display text-[clamp(45px,7vw,76px)] leading-none font-normal tracking-[-.055em]">Dear <span class="text-red italic" data-invitee>friend</span>,</h2>
+        <h2 id="invitation-title" class="m-0 mb-[17px] font-display text-[clamp(45px,7vw,76px)] leading-none font-normal tracking-[-.055em]">Dear <span class="text-red italic" id="person-name">friend</span>,</h2>
         <p class="mx-auto max-w-[580px] font-display text-lg leading-[1.7] text-[#66675f]">The season is brighter when we celebrate together. Join us for a festive evening of good food, familiar faces, and Christmas joy.</p>
       </div>
 
@@ -84,7 +84,8 @@ permalink: /
       <form id="dish-form">
         <fieldset class="min-w-0 p-0">
           <legend class="sr-only">Choose a dish or drink to bring</legend>
-          {% include food-options.html %}
+          <div class="grid grid-cols-1 border-t border-l border-[#fffaf1]/25 min-[390px]:grid-cols-2 md:grid-cols-3" id="food-options"></div>
+          <p class="m-0 py-4 text-[12px] text-[#fffaf1]/70" id="food-options-message" aria-live="polite">Loading the menu…</p>
         </fieldset>
         <div class="flex items-center justify-between gap-[18px] pt-6 max-[389px]:items-start max-[389px]:flex-col">
           <p class="m-0 text-[11px] text-[#fffaf1]/70" id="dish-count" aria-live="polite">Nothing selected yet</p>

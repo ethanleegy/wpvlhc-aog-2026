@@ -8,7 +8,6 @@ The public site remains Jekyll + Tailwind CSS. The backend and React management 
 
 ```text
 index.html, assets/, _includes/    Public Jekyll invitation site
-_data/food_items.yml              Static public menu preview
 firebase/
   functions/                     Node.js 24, Express 5, Joi, Functions v2
   admin-dashboard/               React + Vite management app
