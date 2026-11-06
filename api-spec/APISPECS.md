@@ -15,7 +15,7 @@ Use the absolute deployed API URL on the public Jekyll site. The public invitati
 
 ## Shared-link public registration
 
-Added alongside the personal invitation flow: `POST /registrations`. This backend endpoint is available after deploying the API update. The frontend developer owns the user flow; no public or management UI files are changed by this addition.
+The anonymous public RSVP page submits attending guests to `POST /registrations`; no invitation code or guest lookup is used. It submits the primary attendee's name and selected food items. The optional plus-one name field is currently presentation-only and is not submitted or saved. A decline is not sent to the API and creates no guest record.
 
 The endpoint registers **one attending person**. The server assigns `churchId:"wpvlhc-aog"`, `rsvp:"yes"`, `active:true` and `registrationSource:"public"`. The `wpvlhc-aog` church must already exist and be active. A shared-link visitor choosing not to attend creates no guest record and does not call this endpoint. Existing personal-code decline/update endpoints remain available.
 
@@ -67,9 +67,9 @@ Guest creation, food reservation, contribution and receipt commit atomically. A 
 
 Registrations appear in the existing management list, attendance/food reports and CSVs. Existing `totals.invited` remains the count of active guest records, including these public registrations. Anonymous declines are not included. Names are **not identities**: a different request ID creates a new guest, even if the name already exists on an invitation. This protects existing invitations from being claimed or overwritten by name alone; it is not cross-device duplicate-person detection.
 
-## Personal invitation flow
+## Personal invitation API flow
 
-This existing flow remains supported. The code requirements below apply to personal invitation links; shared-link registration above does not require a code.
+The backend continues to support personal invitation links, but the current public Jekyll page uses anonymous registration above and does not read or retrieve a guest by token. The code requirements below apply only to clients that intentionally use the personal invitation API; shared-link registration does not require a code.
 
 1. Management creates a church, then a named person through `POST /admin/guests`. The server generates their code and `uniqueUrl`, for example `https://public-site.example/gala/?token=a1b2c3d4e5f678901234567`.
 2. The public page reads **`token`** from the query string and calls `GET /token/{token}`. Use returned `personalizedName` for the greeting and `name` for the person's full name. Render names/notes with `textContent`, not HTML.
@@ -82,7 +82,7 @@ One code represents **one person**. The public page cannot change the person's i
 
 For missing/malformed codes, display an invitation-link message and do not submit anonymously. For unknown codes (404), inactive codes (410) or network failures, keep the form disabled until a valid invitation loads. No public directory of guests exists. Keep codes out of analytics, logs, third-party links and browser storage. The layout includes a no-referrer policy.
 
-**Current integration boundary:** `assets/js/site.js` is the original local demo. It must be updated by the frontend developer. Its dish `value` strings from YAML are labels, not API IDs. Render the menu from `/food-items` or explicitly map fetched IDs; never send the label as `foodItemId`.
+**Current integration boundary:** `assets/js/site.js` loads menu options from `GET /food-items` and submits affirmative RSVPs to `POST /registrations` using the entered primary name, fetched food IDs and a private idempotency UUID. The page always greets visitors as “Dear friend” and does not read token query parameters. The optional plus-one name is not included in the API request or saved. Declines are not persisted by the anonymous registration endpoint.
 
 ## Public endpoints
 
@@ -259,7 +259,7 @@ Public submissions allow 60 attempts per invitation per 15 minutes; admin login 
 
 ## Local handoff checklist
 
-Use the setup in [firebase/README.md](../firebase/README.md). Seed the church/menu, create a person from React management, and test the generated `?token=` link on the Jekyll site after wiring the forms. Check initial/repeat replies, attending without food, declining, restoring saved choices, inactive options/links and visible server errors. Public integration is complete only when management reports show the submitted changes.
+Use the setup in [firebase/README.md](../firebase/README.md). Seed the church/menu and submit an anonymous RSVP from the Jekyll site. Check name validation, attending with and without food, idempotent retries, food-slot conflicts, that declines create no registration, and visible server errors. Personal-token clients should separately test the existing invitation API.
 
 ## Photo gallery integration
 

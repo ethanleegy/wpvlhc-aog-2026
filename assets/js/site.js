@@ -1,20 +1,6 @@
 const baseUrl = "https://us-central1-wpvlhc-aog-2026.cloudfunctions.net/api/v1/";
-const params = new URLSearchParams(document.location.search);
-const token = params.get("token");
-
-window.onload = startLoad();
-
-function startLoad() {
-    const submit =  document.getElementById("submit")
-    if (submit) {
-        show = setTimeout(showPage, 500);
-        checkTokenStatus();
-        }
-    const redirect = document.getElementById("redirect")
-    if (redirect) {
-        redirect.href = "/?token="+token;
-    }
-}
+const invitationSections = document.querySelectorAll(".show-page");
+if (invitationSections.length) setTimeout(showPage, 500);
 
 function showPage() {
   const showPages = document.querySelectorAll(".show-page");
@@ -26,6 +12,7 @@ function showPage() {
 
 const rsvpForm = document.querySelector("#rsvp");
 const bringSection = document.querySelector("#bring");
+const guestDetails = document.querySelector("#guest-details");
 const rsvpMessage = document.querySelector("#rsvp-message");
 const submitButton = document.querySelector("#submit");
 const submitWrapper = document.querySelector("#submit-wrapper");
@@ -33,8 +20,7 @@ const dishForm = document.querySelector("#dish-form");
 const dishCount = document.querySelector("#dish-count");
 const foodOptions = document.querySelector("#food-options");
 const foodOptionsMessage = document.querySelector("#food-options-message");
-
-loadFoodItems();
+let pendingRegistration = null;
 
 function updateDishCount() {
   const count = dishForm.querySelectorAll('input[name="dish"]:checked').length;
@@ -114,60 +100,73 @@ async function loadFoodItems() {
   }
 }
 
-rsvpForm.addEventListener("change", (event) => {
-  const attending = event.target.value === "yes";
-  bringSection.hidden = !attending;
-  submitWrapper.hidden = !event.target.value;
-  rsvpMessage.textContent = attending
-    ? ""
-    : "We’ll miss you, and hope to celebrate with you another time.";
+if (rsvpForm && dishForm) {
+  loadFoodItems();
+  rsvpForm.addEventListener("change", (event) => {
+    if (event.target.name !== "attendance") return;
+    const attending = event.target.value === "yes";
+    guestDetails.hidden = !attending;
+    bringSection.hidden = !attending;
+    submitWrapper.hidden = !attending;
+    rsvpMessage.textContent = attending
+      ? "Scroll down to choose what to bring and submit your RSVP ↓"
+      : "We’ll miss you, and hope to celebrate with you another time. No response was submitted.";
 
-  if (attending) {
-    requestAnimationFrame(() => bringSection.scrollIntoView({ behavior: "smooth", block: "start" }));
-  } else {
-    dishForm.reset();
-    updateDishCount();
-  }
-});
+    if (!attending) {
+      dishForm.reset();
+      updateDishCount();
+    }
+  });
 
-rsvpForm.addEventListener("submit", submitResponse);
-dishForm.addEventListener("change", updateDishCount);
+  rsvpForm.addEventListener("submit", submitResponse);
+  dishForm.addEventListener("change", updateDishCount);
+}
 
 //START Submit RSVP Response
 async function submitResponse(event) {
   event.preventDefault();
-  const rsvp = new FormData(rsvpForm).get("attendance");
+  const formData = new FormData(rsvpForm);
+  const rsvp = formData.get("attendance");
   if (rsvp !== "yes" && rsvp !== "no") {
     rsvpMessage.textContent = "Please choose whether you’ll be joining us.";
     return;
   }
-  if (!token) {
-    rsvpMessage.textContent = "Please open your personal invitation link before submitting.";
+  if (rsvp !== "yes") {
+    rsvpMessage.textContent = "Only attending RSVPs can be submitted from this page.";
+    return;
+  }
+  const submittedName = formData.get("name");
+  const name = typeof submittedName === "string" ? submittedName.trim() : "";
+  if (!name) {
+    rsvpMessage.textContent = "Please enter your name.";
+    document.getElementById("guest-name").focus();
     return;
   }
 
   const body = {
-    rsvp,
-    items: rsvp === "yes"
-      ? Array.from(dishForm.querySelectorAll('input[name="dish"]:checked'), (input) => ({
-          foodItemId: input.value,
-          quantity: 1,
-          notes: "",
-        }))
-      : [],
+    name,
+    items: Array.from(dishForm.querySelectorAll('input[name="dish"]:checked'), (input) => ({
+      foodItemId: input.value,
+      quantity: 1,
+      notes: "",
+    })),
   };
+  const fingerprint = JSON.stringify(body);
+  if (!pendingRegistration || pendingRegistration.fingerprint !== fingerprint) {
+    pendingRegistration = { requestId: crypto.randomUUID(), fingerprint };
+  }
 
   submitButton.disabled = true;
   rsvpMessage.textContent = "Submitting your response…";
 
   try {
     const response = await fetch(
-      `${baseUrl}token/${encodeURIComponent(token)}/reply`,
+      `${baseUrl}registrations`,
       {
         method: "POST",
         credentials: "omit",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, requestId: pendingRegistration.requestId }),
       },
     );
     const result = await response.json();
@@ -176,6 +175,7 @@ async function submitResponse(event) {
     }
 
     rsvpMessage.textContent = "Thank you! Your response has been submitted.";
+    pendingRegistration = null;
     window.location.href = "/thank-you";
   } catch (error) {
     console.error("Unable to submit RSVP:", error);
@@ -186,71 +186,3 @@ async function submitResponse(event) {
 }
 
 //END Submit RSVP Response
-
-//START Check Token Status
-
-async function checkTokenStatus() {
-    if (token == null) {
-        document.getElementById("submit").style.display = "none";
-        return;
-    }
-    var url = (baseUrl + 'token/' + token + '/status');
-    //baseUrl and token declared at the top
-
-    try {
-    const response = await fetch(url, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json"
-        }
-    })
-    let tokenStatusBody = await response.json();
-        if (tokenStatusBody.valid == false) {
-          document.getElementById("submit").style.display = "none";
-        }
-        else {
-          populateTokenData();
-        }
-        /* else if (tokenStatusBody.used == true && tokenStatusBody.valid == true) {
-            // this says if the token is used, retrieve it anyway. It renders it like normal, but after populateTokenData() it disables all the buttons and inputs.
-            let res = await populateTokenData();
-            document.getElementsByClassName("rsvp")[0].classList.add("disabled")
-            let button = document.getElementById("submit")
-            button.value = "Submitted";
-            button.disabled = true;
-            let checkboxes = document.getElementsByClassName("guest-checkbox")
-            for (i of checkboxes) {
-                i.disabled = true;
-            }
-
-        }
-          */
-
-    } catch (error) {
-        console.error(error.message);
-    }
-}
-
-//END Check Token Status
-
-//STart Populate Token Data
-
-async function populateTokenData() {
-  var url = (baseUrl + 'token/' + token);
-  //baseUrl and token declared at the top
-
-  try {
-    const response = await fetch(url, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-        }
-    })
-    let tokenDetailsBody = await response.json();
-
-    tokenDetailsBody.name ? document.getElementById("person-name").innerHTML = tokenDetailsBody.name: document.getElementById("person-name").innerHTML = "friend";
-
-  } catch (error) {
-    console.error(error.message);
-  }
-}

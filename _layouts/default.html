@@ -7,9 +7,13 @@
     <meta name="description" content="You’re invited to an evening of Christmas joy, a shared meal, and good company.">
     <title>{{ page.title }} | World Prayer Vision Life Healing Center Assembly of God</title>
     <link rel="stylesheet" href="{{ '/assets/css/tailwind.css' | relative_url }}">
+    {% if page.gallery_stylesheet %}
+    <link rel="stylesheet" href="{{ page.gallery_stylesheet | relative_url }}">
+    {% endif %}
   </head>
   <body class="overflow-x-hidden bg-paper font-sans text-ink antialiased motion-reduce:[&_*]:transition-none">
     {{ content }}
     <script src="{{ '/assets/js/site.js' | relative_url }}" defer></script>
+    <script src="{{ '/assets/js/gallery.js' | relative_url }}" defer></script>
   </body>
 </html>

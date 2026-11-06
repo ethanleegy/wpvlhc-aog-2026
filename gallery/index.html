@@ -1,0 +1,45 @@
+---
+layout: default
+title: Gala Gallery
+permalink: /gallery/
+gallery_stylesheet: /assets/css/gallery.css
+---
+<main>
+  <section class="relative overflow-hidden bg-[#27382f] text-[#fffaf1]" aria-labelledby="gallery-title">
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_75%_15%,rgba(229,201,146,.18),transparent_45%),linear-gradient(115deg,#182b23,#27382f_58%,#34473b)]"></div>
+    <header class="relative z-10 flex items-center justify-between gap-6 px-[clamp(22px,6vw,88px)] py-7 max-md:px-[22px] max-md:py-[23px]">
+      <a class="inline-flex items-center gap-3 text-[11px] font-semibold tracking-[.14em] text-[#fffaf1] uppercase max-md:gap-2 max-md:text-[9px]" href="{{ '/' | relative_url }}" aria-label="Christmas Gala home">
+        <span class="text-[23px] leading-none text-gold" aria-hidden="true">✳</span>
+        <span>World Prayer Vision Life Healing Center Assembly of God</span>
+      </a>
+      <a class="inline-flex shrink-0 items-center gap-[9px] border-b border-[#fffaf1]/55 pb-[5px] text-[10px] font-semibold tracking-[.14em] text-[#fffaf1] uppercase max-md:text-[9px]" href="{{ '/' | relative_url }}">Invitation <span aria-hidden="true">↗</span></a>
+    </header>
+    <div class="relative z-10 mx-auto w-full max-w-[1240px] px-[8vw] pt-[74px] pb-[88px] max-md:px-[25px] max-md:pt-[50px] max-md:pb-[62px]">
+      <p class="mb-6 text-[10px] leading-[1.5] font-bold tracking-[.22em] text-[#e8d5a9] uppercase">A seat at the table</p>
+      <h1 id="gallery-title" class="m-0 font-display text-[clamp(58px,9vw,112px)] leading-[.9] font-normal tracking-[-.075em]">A night to<br><em class="font-normal text-[#e5c992]">remember.</em></h1>
+      <p class="mt-7 max-w-[470px] font-display text-lg leading-[1.7] text-[#fffaf1]/75">A collection of moments and memories from the Christmas Gala.</p>
+    </div>
+  </section>
+
+  <section class="min-h-[55vh] bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,255,255,.54),transparent_57%),var(--color-paper)] px-6 py-[72px] max-md:px-[22px] max-md:py-[48px]" aria-labelledby="photos-title">
+    <div class="mx-auto w-full max-w-[1100px]">
+      <div class="mb-7 flex items-end justify-between gap-5 max-[480px]:items-start max-[480px]:flex-col">
+        <div>
+          <p class="mb-3 text-[10px] font-bold tracking-[.22em] text-red uppercase">The evening, in pictures</p>
+          <h2 id="photos-title" class="m-0 font-display text-[clamp(34px,5vw,52px)] leading-none font-normal tracking-[-.055em]">From the evening</h2>
+        </div>
+        <button class="inline-flex min-h-11 items-center gap-3 border border-[#bcb7aa] px-4 text-[10px] font-bold tracking-[.1em] text-forest uppercase transition-colors hover:bg-forest hover:text-[#fffaf1] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red disabled:cursor-wait disabled:opacity-60" id="gallery-refresh" type="button">Refresh photos <span aria-hidden="true">↻</span></button>
+      </div>
+      <p class="mb-5 min-h-6 text-[13px] leading-[1.5] text-[#66675f]" id="gallery-status" role="status" aria-live="polite">Loading photos…</p>
+      <div id="gallery-grid" class="gallery-masonry"></div>
+      <button class="mx-auto mt-8 inline-flex min-h-12 items-center gap-5 bg-forest px-5 text-[10px] font-bold tracking-[.1em] text-[#fffaf1] uppercase transition-colors hover:bg-[#2f5141] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red disabled:cursor-wait disabled:opacity-60" id="gallery-more" type="button" hidden>Load more photos <span aria-hidden="true">↓</span></button>
+    </div>
+  </section>
+
+  <dialog class="w-[min(94vw,1100px)] max-w-none border border-[#d7d1c5] bg-paper p-3 shadow-2xl backdrop:bg-[#182b23]/90 max-md:p-2" id="photo-viewer" aria-label="Selected gallery photo">
+    <div class="flex justify-end">
+      <button class="inline-flex min-h-10 items-center gap-3 border border-[#bcb7aa] px-4 text-[10px] font-bold tracking-[.1em] text-forest uppercase transition-colors hover:bg-forest hover:text-[#fffaf1] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red" id="gallery-close" type="button">Close <span aria-hidden="true">×</span></button>
+    </div>
+    <img class="mx-auto mt-2 max-h-[78vh] max-w-full object-contain" id="photo-viewer-image" alt="A moment from the Christmas Gala">
+  </dialog>
+</main>

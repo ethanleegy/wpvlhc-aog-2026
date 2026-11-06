@@ -11,13 +11,13 @@ permalink: /
       alt="A warmly lit dining room set for an elegant dinner"
       fetchpriority="high"
     >
-    <div class="absolute inset-0 bg-[linear-gradient(90deg,rgba(20,30,25,.68)_0%,rgba(20,30,25,.28)_55%,rgba(20,30,25,.14)_100%),linear-gradient(0deg,rgba(20,30,25,.48)_0%,transparent_42%,rgba(20,30,25,.23)_100%)]"></div>
-    <div class="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-[clamp(22px,6vw,88px)] py-7 max-md:px-[22px] max-md:py-[23px]">
+    <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(20,30,25,.68)_0%,rgba(20,30,25,.28)_55%,rgba(20,30,25,.14)_100%),linear-gradient(0deg,rgba(20,30,25,.48)_0%,transparent_42%,rgba(20,30,25,.23)_100%)]"></div>
+    <div class="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-[clamp(22px,6vw,88px)] py-7 max-md:px-[22px] max-md:py-[23px]" style="z-index: 20">
       <a class="inline-flex items-center gap-3 text-[11px] font-semibold tracking-[.14em] text-[#fffaf1] uppercase max-md:gap-2 max-md:text-[9px]" href="#invitation" aria-label="Christmas Gala invitation">
         <span class="text-[23px] leading-none text-gold" aria-hidden="true">✳</span>
         <span>World Prayer Vision Life Healing Center Assembly of God</span>
       </a>
-      <a class="inline-flex items-center gap-[9px] border-b border-[#fffaf1]/55 pb-[5px] text-[10px] font-semibold tracking-[.14em] text-[#fffaf1] uppercase max-md:text-[9px]" href="#rsvp">Kindly reply <span aria-hidden="true">↗</span></a>
+      <a class="inline-flex items-center gap-[9px] border-b border-[#fffaf1]/55 pb-[5px] text-[10px] font-semibold tracking-[.14em] text-[#fffaf1] uppercase max-md:text-[9px]" href="{{ '/gallery/' | relative_url }}">View gallery <span aria-hidden="true">↗</span></a>
     </div>
     <div class="relative z-10 mx-auto flex min-h-[min(810px,94svh)] max-w-[1240px] flex-col items-start justify-center px-[8vw] pt-[120px] pb-[110px] max-md:min-h-[min(760px,92svh)] max-md:px-[25px] max-md:pt-[125px] max-md:pb-[105px]">
       <p class="mb-6 text-[10px] leading-[1.5] font-bold tracking-[.22em] text-[#e8d5a9] uppercase">An evening of warmth &amp; wonder</p>
@@ -31,7 +31,7 @@ permalink: /
     <div class="mx-auto w-full max-w-[990px]">
       <div class="mx-auto max-w-[710px] text-center">
         <p class="mb-[19px] text-[10px] leading-[1.5] font-bold tracking-[.22em] text-red uppercase">A little note for you</p>
-        <h2 id="invitation-title" class="m-0 mb-[17px] font-display text-[clamp(45px,7vw,76px)] leading-none font-normal tracking-[-.055em]">Dear <span class="text-red italic" id="person-name">friend</span>,</h2>
+        <h2 id="invitation-title" class="m-0 mb-[17px] font-display text-[clamp(45px,7vw,76px)] leading-none font-normal tracking-[-.055em]">Dear <span class="text-red italic">friend</span>,</h2>
         <p class="mx-auto max-w-[580px] font-display text-lg leading-[1.7] text-[#66675f]">The season is brighter when we celebrate together. Join us for a festive evening of good food, familiar faces, and Christmas joy.</p>
       </div>
 
@@ -65,6 +65,17 @@ permalink: /
             <label class="relative block cursor-pointer">
               <input class="peer sr-only" type="radio" name="attendance" value="no">
               <span class="inline-flex min-w-[190px] items-center justify-between gap-7 border border-[#bcb7aa] bg-transparent px-[17px] py-[15px] text-[11px] font-bold tracking-[.045em] transition-colors peer-checked:border-forest peer-checked:bg-forest peer-checked:text-[#fffaf1] peer-checked:[&>span]:text-gold peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-red max-md:w-full">I can’t make it <span class="text-sm text-red" aria-hidden="true">↗</span></span>
+            </label>
+          </div>
+          <div class="mt-7 grid gap-4 text-left" id="guest-details" hidden>
+            <label class="grid gap-2 text-[10px] font-bold tracking-[.1em] text-forest uppercase" for="guest-name">
+              Your name
+              <input class="min-h-12 border border-[#bcb7aa] bg-white/60 px-4 font-sans text-sm font-normal normal-case tracking-normal text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red" id="guest-name" name="name" type="text" maxlength="160" autocomplete="name" placeholder="Enter your full name" required>
+            </label>
+            <label class="grid gap-2 text-[10px] font-bold tracking-[.1em] text-forest uppercase" for="plus-one-name">
+              Plus-one name <span class="font-normal tracking-normal text-muted normal-case">(optional)</span>
+              <input class="min-h-12 border border-[#bcb7aa] bg-white/60 px-4 font-sans text-sm font-normal normal-case tracking-normal text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red" id="plus-one-name" name="plusOneName" type="text" maxlength="160" autocomplete="off" placeholder="Enter your guest’s name">
+              <span class="text-[11px] font-normal tracking-normal text-muted normal-case">This name is not included in your RSVP.</span>
             </label>
           </div>
         </fieldset>
