@@ -76,6 +76,33 @@ test("invitation URLs preserve the static site's subpath without accepting a cli
     });
 });
 
+test("public registration requires a private UUIDv4 request ID, name and explicit food choices", () => {
+  const valid = {
+    requestId: "62c72547-8a62-4126-9b0e-10ee3e7a50ec",
+    name: "John Henry",
+    items: [{ foodItemId: "gala-food-034", quantity: 12 }],
+  };
+  assert.deepEqual(validate(schemas.registration, valid), {
+    ...valid,
+    items: [{ foodItemId: "gala-food-034", quantity: 12, notes: "" }],
+  });
+  assert.deepEqual(validate(schemas.registration, { ...valid, items: [] }).items, []);
+  for (const payload of [
+    undefined,
+    {},
+    { ...valid, requestId: "guessable-request" },
+    { ...valid, requestId: "62c72547-8a62-1126-9b0e-10ee3e7a50ec" },
+    { ...valid, name: "" },
+    { ...valid, name: "  John Henry  " },
+    { ...valid, name: "J".repeat(161) },
+    { ...valid, items: undefined },
+    { ...valid, items: [{ foodItemId: "food", quantity: "12" }] },
+    { ...valid, items: [{ foodItemId: "food", quantity: 0 }] },
+    { ...valid, items: [{ foodItemId: "food", quantity: 1 }, { foodItemId: "food", quantity: 1 }] },
+    ...["churchId", "rsvp", "active", "token", "registrationSource"].map((key) => ({ ...valid, [key]: "not-client-controlled" })),
+  ]) assert.throws(() => validate(schemas.registration, payload), { status: 400 });
+});
+
 test("reports count only active invitations, yes replies and the requested church", () => {
   const result = buildReport(
     {

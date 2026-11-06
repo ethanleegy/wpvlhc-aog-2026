@@ -17,6 +17,17 @@ const guestFields = {
   churchId: id,
   active: Joi.boolean(),
 };
+const replyItems = Joi.array()
+  .max(30)
+  .unique("foodItemId")
+  .items(
+    Joi.object({
+      foodItemId: id.required(),
+      quantity: Joi.number().integer().min(1).max(10000).required(),
+      notes: text(500).allow("").default(""),
+    }),
+  )
+  .required();
 const schemas = {
   token: Joi.object({ token: token.required() }),
   id: Joi.object({ id: id.required() }),
@@ -47,19 +58,16 @@ const schemas = {
     active: guestFields.active.default(true),
   }),
   guestPatch: Joi.object(guestFields).min(1),
+  registration: Joi.object({
+    requestId: Joi.string()
+      .pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+      .required(),
+    name: guestFields.name.required(),
+    items: replyItems,
+  }),
   reply: Joi.object({
     rsvp: Joi.string().valid("yes", "no").required(),
-    items: Joi.array()
-      .max(30)
-      .unique("foodItemId")
-      .items(
-        Joi.object({
-          foodItemId: id.required(),
-          quantity: Joi.number().integer().min(1).max(10000).required(),
-          notes: text(500).allow("").default(""),
-        }),
-      )
-      .required(),
+    items: replyItems,
   }).custom((value, helpers) =>
     value.rsvp === "no" && value.items.length
       ? helpers.error("any.invalid")

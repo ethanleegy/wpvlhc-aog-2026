@@ -69,6 +69,12 @@ function createApp({ getDb, getConfig, logger = console, galleryStorageFactory }
   });
 
   const api = express.Router();
+  api.post("/registrations", input(schemas.registration), async (req, res) => {
+    // A shared Wi-Fi connection may represent many event guests.
+    await rateLimit(getDb(), `registration:${req.ip}`, 500);
+    const result = await res.locals.service.registerGuest(res.locals.body);
+    res.status(result.created ? 201 : 200).json(result.registration);
+  });
   api.get(
     "/token/:token/status",
     input(schemas.token, "params"),

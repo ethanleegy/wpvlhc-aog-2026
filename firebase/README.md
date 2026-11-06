@@ -6,6 +6,8 @@ The gala uses Firebase Functions v2 (`api`, `us-central1`) with Node.js 24, Expr
 
 The folder layout and versioned invitation endpoints follow the two reference applications. This application uses one person per code, permits response corrections, denies direct browser access to Firestore, and requires configured credentials without fallback passwords.
 
+Public shared-link signup is now supported by `POST /v1/registrations` with `{requestId,name,items}`. It registers an attending guest under the existing active `wpvlhc-aog` church and reserves their food slots in one transaction. Identical UUIDv4 request retries return the original receipt; later edits use the existing guest-code endpoints. Non-attending shared-link visitors create no record. See the [registration contract](../api-spec/APISPECS.md#shared-link-public-registration). No frontend changes, new secrets, environment variables or Firestore indexes are required. Deploy this backend update before the frontend calls the new endpoint; do not reseed existing production data for it.
+
 ## Local setup
 
 Requirements: Node.js 24, npm and Java 21+. On macOS, ensure Java 21's `bin` directory is on `PATH`; setting only `JAVA_HOME` may leave an older `java` active. Check `node --version` and `java -version`.
@@ -78,6 +80,7 @@ Credentials, PUBLIC_SITE_URL and ALLOWED_ORIGINS are required. In production, `P
 | `InvitedGuests` | Server-generated 24-character lowercase hexadecimal invitation code | `name`, `personalizedName`, `churchId`, `active`, `rsvp` (`pending`, `yes`, `no`), `respondedAt`, `createdAt`, `updatedAt` |
 | `FoodItems` | Server ID; seeds: `gala-food-001` etc. | `name`, `description`, `unit`, `active`, `hasContributions`, `claimedBy` (guest code or null), `createdAt`, `updatedAt` |
 | `FoodContributions` | Same code as the person | `guestId`, `items: [{foodItemId, name, unit, quantity, notes}]`, `updatedAt` |
+| `PublicRegistrationRequests` | SHA-256 of event and canonical private UUIDv4 request ID | Input fingerprint, original registration receipt (including guest code), `createdAt`; server-only, retained for idempotent retries |
 | `RateLimits` | SHA-256 digest of a limit key | `count`, `expiresAt` (TTL field) |
 | `SeedData` | `gala-2026-members` | Private `memberTokens` array for repeatable sample seeding |
 
@@ -95,7 +98,7 @@ Reports read a consistent Firestore snapshot. They count active invitations and 
 
 Admin sessions use an 8-hour `__session` HttpOnly cookie, SameSite=Strict, Secure in production. Hosting rewrites `/v1/**` to the function, keeping administration same-origin. Every admin mutation, including login/logout, requires JSON and `X-Admin-Request: true`. Logout clears the browser cookie; copied JWTs expire naturally. Rotate `ADMIN_JWT_SECRET` and redeploy to invalidate all sessions.
 
-Login is limited to 10 attempts per observed client IP per 15 minutes; public replies to 60 per invitation per 15 minutes. Transactional Firestore counters survive cold starts and multiple instances. Expired counters reset before TTL cleanup. Multiple users may share an observed proxy IP; the application does not trust arbitrary forwarded headers.
+Login is limited to 10 attempts per observed client IP per 15 minutes; public replies to 60 per invitation per 15 minutes. Public registration permits 500 validated attempts per observed IP per 15 minutes, including successful replays, to accommodate shared event Wi-Fi. Transactional Firestore counters survive cold starts and multiple instances. Expired counters reset before TTL cleanup. Multiple users may share an observed proxy IP; the application does not trust arbitrary forwarded headers. Registration IDs are private retry credentials, not name-based person deduplication; a new ID creates a distinct person. Guests created through public registration carry `registrationSource:"public"` and are included in the existing active-guest counts, reports and CSVs.
 
 Firestore rules deny all direct client reads/writes. Only the server Admin SDK accesses the database. There is no browser Firestore dependency/configuration. This is a single-event, shared-admin application at church event scale; reporting reads the event's collections. Separate per-church staff accounts and multiple events are outside this implementation.
 

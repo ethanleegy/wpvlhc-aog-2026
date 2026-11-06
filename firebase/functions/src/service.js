@@ -1,4 +1,4 @@
-const { randomBytes } = require("node:crypto");
+const { randomBytes, createHash } = require("node:crypto");
 const { FieldValue, FieldPath } = require("firebase-admin/firestore");
 const { ApiError, requireRecord } = require("./errors");
 
@@ -39,6 +39,48 @@ function createService(db, config) {
   const churches = db.collection("Churches");
   const foods = db.collection("FoodItems");
   const contributions = db.collection("FoodContributions");
+  const registrationRequests = db.collection("PublicRegistrationRequests");
+
+  async function prepareFoodSelection(tx, token, selected, previous = []) {
+    const selectedIds = new Set(selected.map((item) => item.foodItemId));
+    const affectedIds = [
+      ...new Set([...selectedIds, ...previous.map((item) => item.foodItemId)]),
+    ];
+    const foodDocs = affectedIds.length
+      ? await tx.getAll(...affectedIds.map((id) => foods.doc(id)))
+      : [];
+    const foodMap = new Map(foodDocs.map((doc) => [doc.id, doc]));
+    const items = selected.map((item) => {
+      const food = requireRecord(foodMap.get(item.foodItemId), "Food item");
+      if (food.claimedBy && food.claimedBy !== token)
+        throw new ApiError(
+          409,
+          "FOOD_ITEM_TAKEN",
+          `The “${food.name}” slot has already been selected. Please choose another slot.`,
+        );
+      const held = previous.find((row) => row.foodItemId === item.foodItemId)?.quantity || 0;
+      if (!food.active && item.quantity > held)
+        throw new ApiError(
+          409,
+          "FOOD_ITEM_INACTIVE",
+          `The food item “${food.name}” is no longer available`,
+        );
+      return { ...item, name: food.name, unit: food.unit };
+    });
+    return { items, selectedIds, foodDocs };
+  }
+
+  function writeFoodSelection(tx, token, selection, now) {
+    // One contribution document per guest; replacements also release old slots.
+    tx.set(contributions.doc(token), { guestId: token, items: selection.items, updatedAt: now });
+    for (const doc of selection.foodDocs) {
+      if (selection.selectedIds.has(doc.id)) {
+        tx.update(doc.ref, { hasContributions: true, claimedBy: token });
+      } else if (doc.exists && doc.data().claimedBy === token) {
+        tx.update(doc.ref, { claimedBy: null });
+      }
+    }
+  }
 
   async function publicGuest(token) {
     const data = await db.runTransaction(
@@ -79,52 +121,57 @@ function createService(db, config) {
       const guest = requireRecord(guestDoc, "Invitation");
       if (!admin) assertActive(guest);
       const previous = previousDoc.data()?.items || [];
-      const selectedIds = new Set(payload.items.map((item) => item.foodItemId));
-      const affectedIds = [
-        ...new Set([
-          ...selectedIds,
-          ...previous.map((item) => item.foodItemId),
-        ]),
-      ];
-      const foodDocs = affectedIds.length
-        ? await tx.getAll(...affectedIds.map((id) => foods.doc(id)))
-        : [];
-      const foodMap = new Map(foodDocs.map((doc) => [doc.id, doc]));
-      const items = payload.items.map((item) => {
-        const food = requireRecord(foodMap.get(item.foodItemId), "Food item");
-        if (food.claimedBy && food.claimedBy !== token)
-          throw new ApiError(
-            409,
-            "FOOD_ITEM_TAKEN",
-            `The “${food.name}” slot has already been selected. Please choose another slot.`,
-          );
-        const held =
-          previous.find((row) => row.foodItemId === item.foodItemId)
-            ?.quantity || 0;
-        if (!food.active && item.quantity > held)
-          throw new ApiError(
-            409,
-            "FOOD_ITEM_INACTIVE",
-            `The food item “${food.name}” is no longer available`,
-          );
-        return { ...item, name: food.name, unit: food.unit };
-      });
+      const selection = await prepareFoodSelection(tx, token, payload.items, previous);
       const now = FieldValue.serverTimestamp();
       tx.update(guestRef, {
         rsvp: payload.rsvp,
         respondedAt: now,
         updatedAt: now,
       });
-      // One contribution document per guest. Repeated submissions replace rather than append.
-      tx.set(contributionRef, { guestId: token, items, updatedAt: now });
-      for (const doc of foodDocs) {
-        if (selectedIds.has(doc.id)) {
-          tx.update(doc.ref, { hasContributions: true, claimedBy: token });
-        } else if (doc.exists && doc.data().claimedBy === token) {
-          tx.update(doc.ref, { claimedBy: null });
-        }
+      writeFoodSelection(tx, token, selection, now);
+      return { token, rsvp: payload.rsvp, items: selection.items };
+    });
+  }
+
+  async function registerGuest(payload) {
+    const requestKey = createHash("sha256")
+      .update(`gala-2026:registration:${payload.requestId.toLowerCase()}`)
+      .digest("hex");
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify({
+        name: payload.name,
+        items: payload.items
+          .map(({ foodItemId, quantity, notes }) => ({ foodItemId, quantity, notes }))
+          .sort((a, b) => a.foodItemId.localeCompare(b.foodItemId)),
+      }))
+      .digest("hex");
+    const requestRef = registrationRequests.doc(requestKey);
+    const token = randomBytes(12).toString("hex");
+    const churchId = "wpvlhc-aog";
+    return db.runTransaction(async (tx) => {
+      const prior = await tx.get(requestRef);
+      if (prior.exists) {
+        if (prior.data().fingerprint !== fingerprint)
+          throw new ApiError(409, "REQUEST_CHANGED", "This request ID already belongs to a different registration. Use the guest code to update the saved response.");
+        // Return the original receipt without overwriting subsequent RSVP/admin edits.
+        return { created: false, registration: prior.data().registration };
       }
-      return { token, rsvp: payload.rsvp, items };
+      const church = await tx.get(churches.doc(churchId));
+      if (!church.exists || !church.data().active)
+        throw new ApiError(503, "REGISTRATION_UNAVAILABLE", "Guest registration is temporarily unavailable. Please contact the church.");
+      const selection = await prepareFoodSelection(tx, token, payload.items);
+      const now = FieldValue.serverTimestamp();
+      const registration = {
+        token, name: payload.name, churchId, rsvp: "yes", items: selection.items,
+      };
+      tx.create(guests.doc(token), {
+        name: payload.name, personalizedName: "", churchId, active: true,
+        rsvp: "yes", registrationSource: "public",
+        respondedAt: now, createdAt: now, updatedAt: now,
+      });
+      writeFoodSelection(tx, token, selection, now);
+      tx.create(requestRef, { fingerprint, registration, createdAt: now });
+      return { created: true, registration };
     });
   }
 
@@ -271,6 +318,7 @@ function createService(db, config) {
     publicGuest,
     getGuest,
     saveReply,
+    registerGuest,
     createGuest,
     patchGuest,
     listGuests,

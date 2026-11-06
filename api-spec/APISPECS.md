@@ -13,7 +13,63 @@ The complete machine-readable contract is [openapi.json](openapi.json), OpenAPI 
 
 Use the absolute deployed API URL on the public Jekyll site. The public invitation domain (`https://wpvlhc-gala-2026.ivory-gy.com`) serves the Jekyll pages; it does not serve `/v1` API routes. The relative `/v1` base works on the Firebase management host and through the local Vite proxy. Public API calls need no Firebase SDK, API key or admin cookie. Add the public site's exact origin to backend `ALLOWED_ORIGINS`. Do not expose admin credentials in public JavaScript.
 
+## Shared-link public registration
+
+Added alongside the personal invitation flow: `POST /registrations`. This backend endpoint is available after deploying the API update. The frontend developer owns the user flow; no public or management UI files are changed by this addition.
+
+The endpoint registers **one attending person**. The server assigns `churchId:"wpvlhc-aog"`, `rsvp:"yes"`, `active:true` and `registrationSource:"public"`. The `wpvlhc-aog` church must already exist and be active. A shared-link visitor choosing not to attend creates no guest record and does not call this endpoint. Existing personal-code decline/update endpoints remain available.
+
+Use the existing `GET /food-items` catalogue for IDs and units. The public endpoint requires only JSON, with `credentials:"omit"`; no admin session, admin header, Firebase SDK or API key is required.
+
+```http
+POST https://wpvlhc-aog-2026.web.app/v1/registrations
+Content-Type: application/json
+```
+
+```json
+{
+  "requestId": "62c72547-8a62-4126-9b0e-10ee3e7a50ec",
+  "name": "John Henry",
+  "items": [
+    {"foodItemId": "gala-food-034", "quantity": 12, "notes": ""}
+  ]
+}
+```
+
+New registration: **201**. An identical successful retry: **200**, returning the same original receipt:
+
+```json
+{
+  "token": "a1b2c3d4e5f678901234567",
+  "name": "John Henry",
+  "churchId": "wpvlhc-aog",
+  "rsvp": "yes",
+  "items": [
+    {"foodItemId": "gala-food-034", "quantity": 12, "notes": "", "name": "Example dish", "unit": "servings"}
+  ]
+}
+```
+
+The dish name/unit above are illustrative; the API supplies the actual catalogue values. `items:[]` is valid. Name is required, trimmed and at most 160 characters. Item rules are identical to existing replies: up to 30 distinct IDs, integer quantities 1–10,000 and optional trimmed notes up to 500 characters. Do not send `rsvp`, `churchId`, `active`, `token`, `registrationSource` or response-only food name/unit fields; unexpected fields return 400.
+
+Generate a private UUIDv4 `requestId` once per submission, for example with `crypto.randomUUID()`. Reuse it across double clicks, timeouts and retries. UUID case, food-array order, JSON object-field order and omitted versus empty notes do not affect replay. Keep the ID private: anyone holding it and the matching submission can retrieve the receipt and guest code. Do not log it, put it in URLs or send it to analytics. Persist unfinished request information only as needed for recovery and clear it when no longer needed.
+
+Guest creation, food reservation, contribution and receipt commit atomically. A taken/inactive/missing slot creates no partial guest or successful request record. After such a rejection, the request ID may be reused with corrected choices. After success, reusing it with changed information returns `409 REQUEST_CHANGED`. Replays return the **original receipt** and never undo subsequent RSVP/admin changes. Load `GET /token/{token}` for current state and use existing `POST /token/{token}/reply` for later RSVP/food changes; public identity/name edits remain admin-only.
+
+| Error | Handling |
+| --- | --- |
+| `400 VALIDATION_ERROR` | Check request ID, name, item IDs/quantities and unexpected fields. |
+| `404 NOT_FOUND` | A selected food record does not exist; refresh the catalogue. |
+| `409 FOOD_ITEM_TAKEN` / `FOOD_ITEM_INACTIVE` | Refresh available choices and preserve unsaved input. |
+| `409 REQUEST_CHANGED` | The ID already has a successful receipt; use that guest's code for edits. |
+| `429 RATE_LIMITED` | Honor `Retry-After: 900`; limit is 500 validated attempts per observed IP per 15 minutes, including retries. |
+| `503 REGISTRATION_UNAVAILABLE` | The server-assigned church is missing or inactive; operator action is needed. |
+
+Registrations appear in the existing management list, attendance/food reports and CSVs. Existing `totals.invited` remains the count of active guest records, including these public registrations. Anonymous declines are not included. Names are **not identities**: a different request ID creates a new guest, even if the name already exists on an invitation. This protects existing invitations from being claimed or overwritten by name alone; it is not cross-device duplicate-person detection.
+
 ## Personal invitation flow
+
+This existing flow remains supported. The code requirements below apply to personal invitation links; shared-link registration above does not require a code.
 
 1. Management creates a church, then a named person through `POST /admin/guests`. The server generates their code and `uniqueUrl`, for example `https://public-site.example/gala/?token=a1b2c3d4e5f678901234567`.
 2. The public page reads **`token`** from the query string and calls `GET /token/{token}`. Use returned `personalizedName` for the greeting and `name` for the person's full name. Render names/notes with `textContent`, not HTML.
@@ -36,6 +92,7 @@ For missing/malformed codes, display an invitation-link message and do not submi
 | GET | `/token/{token}/status` | 200, name/greeting, `valid:true`, saved RSVP and response timestamp |
 | GET | `/token/{token}` | 200, person, church, RSVP and saved food choices |
 | GET | `/food-items` | 200, `{foodItems:[{id,name,description,unit}]}`; active, unclaimed slots only |
+| POST | `/registrations` | 201 new attending guest, or 200 original receipt on identical retry; `{requestId,name,items}` |
 | POST | `/token/{token}/reply` | 200, saved `{token,rsvp,items}` |
 
 Invitation response example:

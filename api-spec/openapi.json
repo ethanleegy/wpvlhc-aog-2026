@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "WPVLHC AOG Christmas Gala API",
-    "version": "1.1.0",
-    "description": "Node.js 24 + Express 5 + Joi + Firestore. Public invitation flows and authenticated church administration. All timestamps are UTC ISO 8601 strings. All non-health responses use Cache-Control: private, no-store. No direct client Firestore access."
+    "version": "1.2.0",
+    "description": "Node.js 24 + Express 5 + Joi + Firestore. Public shared-link registration, invitation flows and authenticated church administration. All timestamps are UTC ISO 8601 strings. All non-health responses use Cache-Control: private, no-store. No direct client Firestore access."
   },
   "servers": [
     {
@@ -120,6 +120,159 @@
           }
         },
         "description": "Liveness probe only. Does not validate configuration/database access and does not enable cross-origin browser reads. Use a same-origin request or a server/API client."
+      }
+    },
+    "/registrations": {
+      "post": {
+        "tags": [
+          "Public"
+        ],
+        "summary": "Register one attending guest and reserve their food choices",
+        "operationId": "postRegistration",
+        "security": [],
+        "description": "Public shared-link signup; no admin login or invitation code. Server fixes churchId=wpvlhc-aog, rsvp=yes, active=true and registrationSource=public. Creates guest, contribution, slot reservations and private idempotency receipt in one transaction. A rejected slot creates no partial registration. Reuse a private UUIDv4 requestId with identical information for safe retries; changed information with a completed ID returns 409 REQUEST_CHANGED. Object-field order, food-selection order and omitted/empty notes do not change the request identity. A new UUID means a new person, even for an equal name. Non-attending shared-link visitors do not call this endpoint and create no record. Limited to 500 validated attempts per observed IP per 15 minutes, including retries, to accommodate shared Wi-Fi. Existing invitation/admin/gallery routes remain available.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationInput"
+              },
+              "example": {
+                "requestId": "62c72547-8a62-4126-9b0e-10ee3e7a50ec",
+                "name": "John Henry",
+                "items": [
+                  {
+                    "foodItemId": "gala-food-034",
+                    "quantity": 12,
+                    "notes": ""
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New registration saved atomically.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Registration"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Identical successful request replayed; original receipt, no new registration or slot updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Registration"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON/schema, non-UUIDv4 ID, missing name/items, duplicate food IDs or unexpected fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origin is not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Selected food item does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FOOD_ITEM_TAKEN, FOOD_ITEM_INACTIVE or REQUEST_CHANGED; no partial guest/contribution created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 32 KB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED. Shared observed-IP limit reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying.",
+                "schema": {
+                  "type": "integer",
+                  "example": 900
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server/configuration failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "REGISTRATION_UNAVAILABLE: the server-assigned church is missing or inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/token/{token}/status": {
@@ -362,7 +515,7 @@
             }
           }
         },
-        "description": "Returns active, unclaimed single-person contribution slots. Repeated names have separate IDs and must remain separate options. Restore the current guest\u2019s saved items from GET /token/{token}."
+        "description": "Returns active, unclaimed single-person contribution slots. Repeated names have separate IDs and must remain separate options. Restore the current guest’s saved items from GET /token/{token}."
       }
     },
     "/token/{token}/reply": {
@@ -6478,6 +6631,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "registrationSource": {
+            "type": "string",
+            "enum": [
+              "public"
+            ],
+            "description": "Present on guests created by the public registration endpoint. Legacy/admin-created records may omit it."
           }
         },
         "required": [
@@ -7474,6 +7634,80 @@
           "photos",
           "nextCursor"
         ]
+      },
+      "RegistrationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+            "example": "62c72547-8a62-4126-9b0e-10ee3e7a50ec",
+            "description": "Private UUIDv4 generated once for one submission. Identical retries reuse it. Upper/lowercase UUIDs identify the same request. Do not log it or send it to analytics: it can retrieve the original receipt and guest code."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "description": "Trimmed full name of one attending person. Names are not used to find or merge existing invitations."
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "$ref": "#/components/schemas/ContributionInput"
+            },
+            "description": "Unique foodItemId values. Empty is valid when attending without bringing an item. Names and units are supplied by the server."
+          }
+        },
+        "required": [
+          "requestId",
+          "name",
+          "items"
+        ]
+      },
+      "Registration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{24}$",
+            "example": "a1b2c3d4e5f678901234567"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "churchId": {
+            "type": "string",
+            "enum": [
+              "wpvlhc-aog"
+            ]
+          },
+          "rsvp": {
+            "type": "string",
+            "enum": [
+              "yes"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionItem"
+            }
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "churchId",
+          "rsvp",
+          "items"
+        ],
+        "description": "Original successful registration receipt. Replays return this receipt without reapplying changes or overwriting later RSVP/admin edits. Use GET /token/{token} for current state."
       }
     }
   }
