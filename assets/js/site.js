@@ -176,6 +176,7 @@ async function submitResponse(event) {
     }
 
     rsvpMessage.textContent = "Thank you! Your response has been submitted.";
+    window.location.href = "/thank-you";
   } catch (error) {
     console.error("Unable to submit RSVP:", error);
     rsvpMessage.textContent = error.message || "Unable to submit your response. Please try again.";
