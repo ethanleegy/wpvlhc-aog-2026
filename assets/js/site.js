@@ -13,6 +13,9 @@ function showPage() {
 const rsvpForm = document.querySelector("#rsvp");
 const bringSection = document.querySelector("#bring");
 const guestDetails = document.querySelector("#guest-details");
+const plusOneCheckbox = document.querySelector("#plus-one");
+const plusOneDetails = document.querySelector("#plus-one-details");
+const plusOneNameInput = document.querySelector("#plus-one-name");
 const rsvpMessage = document.querySelector("#rsvp-message");
 const submitButton = document.querySelector("#submit");
 const submitWrapper = document.querySelector("#submit-wrapper");
@@ -103,6 +106,13 @@ async function loadFoodItems() {
 if (rsvpForm && dishForm) {
   loadFoodItems();
   rsvpForm.addEventListener("change", (event) => {
+    if (event.target === plusOneCheckbox) {
+      plusOneDetails.hidden = !plusOneCheckbox.checked;
+      plusOneNameInput.required = plusOneCheckbox.checked;
+      if (!plusOneCheckbox.checked) plusOneNameInput.value = "";
+      return;
+    }
+
     if (event.target.name !== "attendance") return;
     const attending = event.target.value === "yes";
     guestDetails.hidden = !attending;
@@ -115,6 +125,10 @@ if (rsvpForm && dishForm) {
     if (!attending) {
       dishForm.reset();
       updateDishCount();
+      plusOneCheckbox.checked = false;
+      plusOneDetails.hidden = true;
+      plusOneNameInput.required = false;
+      plusOneNameInput.value = "";
     }
   });
 
@@ -143,8 +157,18 @@ async function submitResponse(event) {
     return;
   }
 
+  const isBringingPlusOne = plusOneCheckbox.checked;
+  const submittedPlusOneName = plusOneNameInput.value.trim();
+  if (isBringingPlusOne && !submittedPlusOneName) {
+    rsvpMessage.textContent = "Please enter your plus-one’s name.";
+    plusOneNameInput.focus();
+    return;
+  }
+
   const body = {
     name,
+    plusOne: isBringingPlusOne,
+    ...(isBringingPlusOne ? { plusOneName: submittedPlusOneName } : {}),
     items: Array.from(dishForm.querySelectorAll('input[name="dish"]:checked'), (input) => ({
       foodItemId: input.value,
       quantity: 1,
