@@ -14,13 +14,15 @@ function csv(headers, rows) {
 }
 function guestCsv(report) {
   return csv(
-    ["Name", "Church", "RSVP", "Invitation URL", "Responded at"],
+    ["Name", "Church", "RSVP", "Invitation URL", "Responded at", "Plus one", "Plus-one name"],
     report.guests.map((guest) => [
       guest.name,
       guest.churchName,
       guest.rsvp,
       guest.uniqueUrl,
       guest.respondedAt,
+      guest.plusOne === true ? "Yes" : "No",
+      guest.plusOne === true ? guest.plusOneName : "",
     ]),
   );
 }

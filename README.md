@@ -22,10 +22,11 @@ api-spec/
 
 ## Features
 
-- One person per invitation, with a generated URL such as `https://your-public-site.example/?token=<code>`. Names and greetings come from Firestore; duplicate names receive distinct codes.
+- One primary attendee per invitation, with an optional named plus-one and a generated URL such as `https://your-public-site.example/?token=<code>`. Names and greetings come from Firestore; duplicate primary names receive distinct codes.
+- Public shared-link registration accepts the attendee's name, optional companion name and food choices together. The frontend developer handles the prompts; the backend API preserves the existing personal invitation flow.
 - Guests can save/revise attendance and food quantities/notes. Resubmitting replaces choices without duplicate contributions. Declining clears contributions.
 - Protected React management for churches, invitations and food options, with link copying and response corrections on behalf of guests.
-- Attendance by church, food quantities and contributor counts, church filters and guest/food CSV exports.
+- Attendance by church, confirmed companion/total-person counts, food quantities and contributor counts, church filters and guest/food CSV exports including companion names.
 - Joi validation, configured admin credentials, restricted origins, shared rate limits and server-only Firestore access.
 
 ## Frontend handoff

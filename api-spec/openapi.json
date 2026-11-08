@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "WPVLHC AOG Christmas Gala API",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "Node.js 24 + Express 5 + Joi + Firestore. Public shared-link registration, invitation flows and authenticated church administration. All timestamps are UTC ISO 8601 strings. All non-health responses use Cache-Control: private, no-store. No direct client Firestore access."
   },
   "servers": [
@@ -127,10 +127,10 @@
         "tags": [
           "Public"
         ],
-        "summary": "Register one attending guest and reserve their food choices",
+        "summary": "Register an attending guest, optional named companion and food choices",
         "operationId": "postRegistration",
         "security": [],
-        "description": "Public shared-link signup; no admin login or invitation code. Server fixes churchId=wpvlhc-aog, rsvp=yes, active=true and registrationSource=public. Creates guest, contribution, slot reservations and private idempotency receipt in one transaction. A rejected slot creates no partial registration. Reuse a private UUIDv4 requestId with identical information for safe retries; changed information with a completed ID returns 409 REQUEST_CHANGED. Object-field order, food-selection order and omitted/empty notes do not change the request identity. A new UUID means a new person, even for an equal name. Non-attending shared-link visitors do not call this endpoint and create no record. Limited to 500 validated attempts per observed IP per 15 minutes, including retries, to accommodate shared Wi-Fi. Existing invitation/admin/gallery routes remain available.",
+        "description": "Public shared-link signup; no admin login or invitation code. Server fixes churchId=wpvlhc-aog, rsvp=yes, active=true and registrationSource=public. Creates guest, contribution, slot reservations and private idempotency receipt in one transaction. A rejected slot creates no partial registration. Reuse a private UUIDv4 requestId with identical information for safe retries; changed information with a completed ID returns 409 REQUEST_CHANGED. Object-field order, food-selection order and omitted/empty notes do not change the request identity. A new UUID means a new person, even for an equal name. Non-attending shared-link visitors do not call this endpoint and create no record. Limited to 500 validated attempts per observed IP per 15 minutes, including retries, to accommodate shared Wi-Fi. Existing invitation/admin/gallery routes remain available. Optional plusOne=true requires plusOneName; one companion maximum, stored on the primary guest without another token, food reservation or gallery identity. Companion changes after successful registration return REQUEST_CHANGED; edit via the existing token reply route. Omitted and explicit false/empty companion fields share the pre-upgrade retry identity.",
         "requestBody": {
           "required": true,
           "content": {
@@ -147,7 +147,9 @@
                     "quantity": 12,
                     "notes": ""
                   }
-                ]
+                ],
+                "plusOne": true,
+                "plusOneName": "Jane Henry"
               }
             }
           }
@@ -174,7 +176,7 @@
             }
           },
           "400": {
-            "description": "Invalid JSON/schema, non-UUIDv4 ID, missing name/items, duplicate food IDs or unexpected fields.",
+            "description": "Invalid JSON/schema, non-UUIDv4 ID, missing name/items, duplicate food IDs or unexpected fields. Invalid companion flag/name combination, blank/untrimmed name or name over 160 characters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -357,7 +359,7 @@
             }
           }
         ],
-        "description": "An active invitation remains valid after responding. Unknown codes return 404; inactive codes return 410. Codes are case-sensitive."
+        "description": "An active invitation remains valid after responding. Unknown codes return 404; inactive codes return 410. Codes are case-sensitive. Includes the saved plusOne and plusOneName."
       }
     },
     "/token/{token}": {
@@ -640,7 +642,7 @@
             }
           }
         ],
-        "description": "Atomic update. Repeat submissions replace choices, never add quantities. No client name, church or token in the body. 60 attempts per invitation per 15 minutes. Existing inactive items may be kept or reduced but cannot be increased. Each food item ID is a single-person slot. A competing claim returns 409 FOOD_ITEM_TAKEN. Removing the item or declining releases it; the owner may revise quantities.",
+        "description": "Atomic update. Repeat submissions replace choices, never add quantities. No client name, church or token in the body. 60 attempts per invitation per 15 minutes. Existing inactive items may be kept or reduced but cannot be increased. Each food item ID is a single-person slot. A competing claim returns 409 FOOD_ITEM_TAKEN. Removing the item or declining releases it; the owner may revise quantities. Optional plusOne=true requires plusOneName; omit both to preserve a saved companion on an attending update. plusOne=false clears the name. Declining clears both fields and rejects plusOne=true. The primary attendee name remains immutable publicly.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2060,7 +2062,7 @@
             "description": "Required on every admin mutation, including login/logout."
           }
         ],
-        "description": "One invitation is one person, not a household. Server generates the code, ID and URL. Duplicate names are allowed and receive distinct codes.",
+        "description": "One code identifies one named primary attendee, optionally with one named companion; it is not a household registration. Server generates the code, ID and URL. Duplicate primary names are allowed and receive distinct codes. Companions on pending invitations are counted only after rsvp=yes.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2315,7 +2317,7 @@
             "description": "Required on every admin mutation, including login/logout."
           }
         ],
-        "description": "The code/URL is immutable. Deactivation makes public access return 410 and excludes the person from reports. Reactivation restores their recorded reply and contributions. A church change also moves contributions to that church in reports.",
+        "description": "The code/URL is immutable. Deactivation makes public access return 410 and excludes the person from reports. Reactivation restores their recorded reply and contributions. A church change also moves contributions to that church in reports. Companion edits require plusOne=true with plusOneName, or plusOne=false to clear it; omit both to preserve. Adding a companion to a declined guest returns 400 VALIDATION_ERROR; record an attending RSVP first through the admin reply route.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2466,7 +2468,7 @@
             "description": "Required on every admin mutation, including login/logout."
           }
         ],
-        "description": "Uses the same atomic replacement rules as public replies. Permitted for inactive invitations; these remain excluded from reports. Each food item ID is a single-person slot. A competing claim returns 409 FOOD_ITEM_TAKEN. Removing the item or declining releases it; the owner may revise quantities.",
+        "description": "Uses the same atomic replacement rules as public replies. Permitted for inactive invitations; these remain excluded from reports. Each food item ID is a single-person slot. A competing claim returns 409 FOOD_ITEM_TAKEN. Removing the item or declining releases it; the owner may revise quantities. Optional plusOne=true requires plusOneName; omit both to preserve a saved companion on an attending update. plusOne=false clears the name. Declining clears both fields and rejects plusOne=true. The primary attendee name remains immutable publicly.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2566,7 +2568,7 @@
             "description": "Optional church filter. Report counts include active invitations only."
           }
         ],
-        "description": "Consistent Firestore snapshot. Active invitations only. Contributions count only attending guests. Quantities are grouped per food item and its unit; never summed across different items/units. Inactive churches/foods retain their current commitments."
+        "description": "Consistent Firestore snapshot. Active invitations only. Contributions count only attending guests. Quantities are grouped per food item and its unit; never summed across different items/units. Inactive churches/foods retain their current commitments. Overall and per-church plusOnes counts confirmed companions; attendingPeople=yes+plusOnes. Existing RSVP counts and food quantities retain their previous meanings."
       }
     },
     "/admin/reports/guests.csv": {
@@ -2657,7 +2659,7 @@
             "description": "Optional church filter. Report counts include active invitations only."
           }
         ],
-        "description": "UTF-8 with BOM and CRLF. Includes personal invitation URLs; keep private. Only active invitations. Formula-like cells are neutralized."
+        "description": "UTF-8 with BOM and CRLF. Includes personal invitation URLs; keep private. Only active invitations. Formula-like cells are neutralized. Appends Plus one (Yes/No) and Plus-one name after the existing Name, Church, RSVP, Invitation URL, Responded at columns. One row per primary guest, with the companion on the same row."
       }
     },
     "/admin/reports/food.csv": {
@@ -6543,13 +6545,27 @@
           "active": {
             "type": "boolean",
             "default": true
+          },
+          "plusOne": {
+            "type": "boolean",
+            "description": "Whether the primary attendee is bringing one companion. Omitted on create means false; omit both companion fields on updates to preserve the saved choice."
+          },
+          "plusOneName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Trimmed companion name, required and nonempty with plusOne=true. With plusOne=false omit it or send an empty string. Cannot be sent without plusOne."
           }
         },
         "required": [
           "name",
           "churchId"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlusOneInputRules"
+          }
+        ]
       },
       "GuestPatch": {
         "type": "object",
@@ -6570,10 +6586,24 @@
           },
           "active": {
             "type": "boolean"
+          },
+          "plusOne": {
+            "type": "boolean",
+            "description": "Whether the primary attendee is bringing one companion. Omitted on create means false; omit both companion fields on updates to preserve the saved choice."
+          },
+          "plusOneName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Trimmed companion name, required and nonempty with plusOne=true. With plusOne=false omit it or send an empty string. Cannot be sent without plusOne."
           }
         },
         "minProperties": 1,
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlusOneInputRules"
+          }
+        ]
       },
       "Guest": {
         "type": "object",
@@ -6638,6 +6668,15 @@
               "public"
             ],
             "description": "Present on guests created by the public registration endpoint. Legacy/admin-created records may omit it."
+          },
+          "plusOne": {
+            "type": "boolean",
+            "description": "One companion recorded on this primary attendee. Legacy records/receipts without companion fields return false."
+          },
+          "plusOneName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Companion name when plusOne=true; otherwise an empty string."
           }
         },
         "required": [
@@ -6651,7 +6690,9 @@
           "rsvp",
           "respondedAt",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "plusOne",
+          "plusOneName"
         ]
       },
       "ContributionInput": {
@@ -6731,6 +6772,15 @@
             },
             "maxItems": 30,
             "description": "Complete replacement of this person's choices. Unique foodItemId values. Must be empty for rsvp=no. Empty is allowed for rsvp=yes."
+          },
+          "plusOne": {
+            "type": "boolean",
+            "description": "Whether the primary attendee is bringing one companion. Omitted on create means false; omit both companion fields on updates to preserve the saved choice."
+          },
+          "plusOneName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Trimmed companion name, required and nonempty with plusOne=true. With plusOne=false omit it or send an empty string. Cannot be sent without plusOne."
           }
         },
         "required": [
@@ -6760,10 +6810,22 @@
               "items": {
                 "type": "array",
                 "maxItems": 0
+              },
+              "plusOne": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
               }
             }
           }
-        ]
+        ],
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlusOneInputRules"
+          }
+        ],
+        "description": "Declining requires items=[] and cannot include plusOne=true. Declining clears any saved companion. An attending update omitting both companion fields preserves the saved pair."
       },
       "Reply": {
         "type": "object",
@@ -6785,12 +6847,23 @@
             "items": {
               "$ref": "#/components/schemas/ContributionItem"
             }
+          },
+          "plusOne": {
+            "type": "boolean",
+            "description": "One companion recorded on this primary attendee. Legacy records/receipts without companion fields return false."
+          },
+          "plusOneName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Companion name when plusOne=true; otherwise an empty string."
           }
         },
         "required": [
           "token",
           "rsvp",
-          "items"
+          "items",
+          "plusOne",
+          "plusOneName"
         ]
       },
       "PublicGuest": {
@@ -6852,6 +6925,15 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "plusOne": {
+            "type": "boolean",
+            "description": "One companion recorded on this primary attendee. Legacy records/receipts without companion fields return false."
+          },
+          "plusOneName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Companion name when plusOne=true; otherwise an empty string."
           }
         },
         "required": [
@@ -6862,7 +6944,9 @@
           "rsvp",
           "items",
           "respondedAt",
-          "updatedAt"
+          "updatedAt",
+          "plusOne",
+          "plusOneName"
         ]
       },
       "TokenStatus": {
@@ -6901,6 +6985,15 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "plusOne": {
+            "type": "boolean",
+            "description": "One companion recorded on this primary attendee. Legacy records/receipts without companion fields return false."
+          },
+          "plusOneName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Companion name when plusOne=true; otherwise an empty string."
           }
         },
         "required": [
@@ -6909,7 +7002,9 @@
           "personalizedName",
           "valid",
           "rsvp",
-          "respondedAt"
+          "respondedAt",
+          "plusOne",
+          "plusOneName"
         ]
       },
       "Counts": {
@@ -6933,7 +7028,18 @@
           },
           "contributors": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Attending primary guest records with food choices; companions do not increase this count."
+          },
+          "plusOnes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Companions of active primary attendees with rsvp=yes. Pending, declined and inactive guests do not contribute."
+          },
+          "attendingPeople": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Confirmed people: yes + plusOnes. Existing invited/yes/no/pending counts still count primary guest records."
           }
         },
         "required": [
@@ -6941,7 +7047,9 @@
           "yes",
           "no",
           "pending",
-          "contributors"
+          "contributors",
+          "plusOnes",
+          "attendingPeople"
         ]
       },
       "ChurchReport": {
@@ -6965,7 +7073,8 @@
           },
           "contributors": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Attending primary guest records with food choices; companions do not increase this count."
           },
           "churchId": {
             "type": "string",
@@ -6976,6 +7085,16 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 160
+          },
+          "plusOnes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Companions of active primary attendees with rsvp=yes. Pending, declined and inactive guests do not contribute."
+          },
+          "attendingPeople": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Confirmed people: yes + plusOnes. Existing invited/yes/no/pending counts still count primary guest records."
           }
         },
         "required": [
@@ -6985,7 +7104,9 @@
           "pending",
           "contributors",
           "churchId",
-          "name"
+          "name",
+          "plusOnes",
+          "attendingPeople"
         ]
       },
       "FoodReport": {
@@ -7659,12 +7780,26 @@
               "$ref": "#/components/schemas/ContributionInput"
             },
             "description": "Unique foodItemId values. Empty is valid when attending without bringing an item. Names and units are supplied by the server."
+          },
+          "plusOne": {
+            "type": "boolean",
+            "description": "Whether the primary attendee is bringing one companion. Omitted on create means false; omit both companion fields on updates to preserve the saved choice."
+          },
+          "plusOneName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Trimmed companion name, required and nonempty with plusOne=true. With plusOne=false omit it or send an empty string. Cannot be sent without plusOne."
           }
         },
         "required": [
           "requestId",
           "name",
           "items"
+        ],
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlusOneInputRules"
+          }
         ]
       },
       "Registration": {
@@ -7698,6 +7833,15 @@
             "items": {
               "$ref": "#/components/schemas/ContributionItem"
             }
+          },
+          "plusOne": {
+            "type": "boolean",
+            "description": "One companion recorded on this primary attendee. Legacy records/receipts without companion fields return false."
+          },
+          "plusOneName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Companion name when plusOne=true; otherwise an empty string."
           }
         },
         "required": [
@@ -7705,9 +7849,72 @@
           "name",
           "churchId",
           "rsvp",
-          "items"
+          "items",
+          "plusOne",
+          "plusOneName"
         ],
-        "description": "Original successful registration receipt. Replays return this receipt without reapplying changes or overwriting later RSVP/admin edits. Use GET /token/{token} for current state."
+        "description": "Original successful registration receipt. Replays return this receipt without reapplying changes or overwriting later RSVP/admin edits. Use GET /token/{token} for current state. Legacy receipts are normalized to plusOne=false and plusOneName=\"\". No-companion retry fingerprints remain compatible with the previous API version."
+      },
+      "PlusOneInputRules": {
+        "type": "object",
+        "description": "Omit both fields, explicitly clear with plusOne=false, or supply plusOne=true and a trimmed nonempty companion name. No independent name-only updates.",
+        "oneOf": [
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "plusOne"
+                  ]
+                },
+                {
+                  "required": [
+                    "plusOneName"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "plusOne"
+            ],
+            "properties": {
+              "plusOne": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              },
+              "plusOneName": {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              }
+            }
+          },
+          {
+            "required": [
+              "plusOne",
+              "plusOneName"
+            ],
+            "properties": {
+              "plusOne": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              },
+              "plusOneName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+              }
+            }
+          }
+        ]
       }
     }
   }

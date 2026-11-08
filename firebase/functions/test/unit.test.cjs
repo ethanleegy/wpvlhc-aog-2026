@@ -140,6 +140,8 @@ test("reports count only active invitations, yes replies and the requested churc
     no: 1,
     pending: 0,
     contributors: 1,
+    plusOnes: 0,
+    attendingPeople: 1,
   });
   assert.equal(result.foodItems[0].quantity, 10);
   assert.equal(result.contributions.length, 1);
@@ -165,11 +167,62 @@ test("CSV escapes quotes and neutralizes spreadsheet formulas", () => {
         rsvp: "yes",
         uniqueUrl: "https://example.org/?token=a",
         respondedAt: null,
+        plusOne: true,
+        plusOneName: '=HYPERLINK("untrusted")',
       },
     ],
   });
   assert.ok(output.startsWith("\uFEFF"));
   assert.ok(output.includes("\r\n"));
+  assert.ok(output.includes('"Plus one","Plus-one name"'));
+  assert.ok(output.includes('"Yes","\'=HYPERLINK(""untrusted"")"'));
+});
+
+test("plus-ones require an explicit boolean and companion name across all guest mutations", () => {
+  const targets = [
+    [schemas.registration, { requestId: "62c72547-8a62-4126-9b0e-10ee3e7a50ec", name: "John", items: [] }],
+    [schemas.reply, { rsvp: "yes", items: [] }],
+    [schemas.guestCreate, { name: "John", churchId: "wpvlhc-aog" }],
+    [schemas.guestPatch, { name: "John" }],
+  ];
+  for (const [schema, base] of targets) {
+    for (const fields of [{}, { plusOne: false }, { plusOne: false, plusOneName: "" }, { plusOne: true, plusOneName: "Jane Henry" }])
+      assert.doesNotThrow(() => validate(schema, { ...base, ...fields }));
+    for (const fields of [
+      { plusOne: "true", plusOneName: "Jane" }, { plusOne: 1, plusOneName: "Jane" },
+      { plusOne: null }, { plusOne: true }, { plusOne: true, plusOneName: "" },
+      { plusOne: true, plusOneName: "  " }, { plusOne: true, plusOneName: " Jane " },
+      { plusOne: true, plusOneName: "J".repeat(161) }, { plusOne: true, plusOneName: 123 },
+      { plusOne: false, plusOneName: "Jane" }, { plusOneName: "Jane" }, { plusOneName: "" },
+    ]) assert.throws(() => validate(schema, { ...base, ...fields }), { status: 400 });
+    assert.doesNotThrow(() => validate(schema, { ...base, plusOne: true, plusOneName: "J".repeat(160) }));
+  }
+  assert.throws(() => validate(schemas.reply, { rsvp: "no", items: [], plusOne: true, plusOneName: "Jane" }), { status: 400 });
+  assert.doesNotThrow(() => validate(schemas.reply, { rsvp: "no", items: [], plusOne: false }));
+});
+
+test("attendance headcounts include companions once without changing guest or food counts", () => {
+  const data = {
+    churches: [{ id: "a", name: "Church A" }, { id: "b", name: "Church B" }],
+    guests: [
+      { id: "1", name: "Pat", churchId: "a", active: true, rsvp: "yes", plusOne: true, plusOneName: "Alex" },
+      { id: "2", name: "Legacy", churchId: "a", active: true, rsvp: "yes" },
+      { id: "3", churchId: "a", active: true, rsvp: "no", plusOne: true, plusOneName: "Not counted" },
+      { id: "4", churchId: "a", active: true, rsvp: "pending", plusOne: true, plusOneName: "Not confirmed" },
+      { id: "5", churchId: "a", active: false, rsvp: "yes", plusOne: true, plusOneName: "Inactive" },
+      { id: "6", churchId: "b", active: true, rsvp: "yes", plusOne: true, plusOneName: "Another" },
+    ],
+    foodItems: [{ id: "food", name: "Rice", unit: "servings", active: true }],
+    contributions: [{ guestId: "1", items: [{ foodItemId: "food", quantity: 4, name: "Rice", unit: "servings", notes: "" }] }],
+  };
+  const overall = buildReport(data);
+  assert.deepEqual(overall.totals, { invited: 5, yes: 3, no: 1, pending: 1, contributors: 1, plusOnes: 2, attendingPeople: 5 });
+  assert.equal(overall.churches[0].attendingPeople, 3); assert.equal(overall.churches[1].attendingPeople, 2);
+  const filtered = buildReport(data, "a");
+  assert.deepEqual(filtered.totals, { invited: 4, yes: 2, no: 1, pending: 1, contributors: 1, plusOnes: 1, attendingPeople: 3 });
+  assert.equal(filtered.foodItems[0].quantity, 4); assert.equal(filtered.contributions.length, 1);
+  assert.equal(filtered.guests.find((g) => g.id === "2").plusOne, false);
+  assert.equal(filtered.guests.find((g) => g.id === "2").plusOneName, "");
 });
 
 test("production has no default credentials or insecure cookie mode", () => {

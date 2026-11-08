@@ -293,6 +293,8 @@ test("admin replies, pagination, church reassignment, reports, CSV and disabling
     no: 0,
     pending: 1,
     contributors: 1,
+    plusOnes: 0,
+    attendingPeople: 1,
   });
   assert.equal(report.contributions[0].churchId, churchB.id);
   const csv = await agent

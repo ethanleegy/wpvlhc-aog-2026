@@ -15,9 +15,9 @@ Use the absolute deployed API URL on the public Jekyll site. The public invitati
 
 ## Shared-link public registration
 
-The anonymous public RSVP page submits attending guests to `POST /registrations`; no invitation code or guest lookup is used. It submits the primary attendee's name and selected food items. The optional plus-one name field is currently presentation-only and is not submitted or saved. A decline is not sent to the API and creates no guest record.
+Added alongside the personal invitation flow: `POST /registrations`. This backend endpoint is available after deploying the API update. The frontend developer owns the user flow; no public or management UI files are changed by this addition.
 
-The endpoint registers **one attending person**. The server assigns `churchId:"wpvlhc-aog"`, `rsvp:"yes"`, `active:true` and `registrationSource:"public"`. The `wpvlhc-aog` church must already exist and be active. A shared-link visitor choosing not to attend creates no guest record and does not call this endpoint. Existing personal-code decline/update endpoints remain available.
+The endpoint registers **one named primary attendee, optionally with one named companion**. The server assigns `churchId:"wpvlhc-aog"`, `rsvp:"yes"`, `active:true` and `registrationSource:"public"`. The `wpvlhc-aog` church must already exist and be active. A shared-link visitor choosing not to attend creates no guest record and does not call this endpoint. Existing personal-code decline/update endpoints remain available.
 
 Use the existing `GET /food-items` catalogue for IDs and units. The public endpoint requires only JSON, with `credentials:"omit"`; no admin session, admin header, Firebase SDK or API key is required.
 
@@ -30,6 +30,8 @@ Content-Type: application/json
 {
   "requestId": "62c72547-8a62-4126-9b0e-10ee3e7a50ec",
   "name": "John Henry",
+  "plusOne": true,
+  "plusOneName": "Jane Henry",
   "items": [
     {"foodItemId": "gala-food-034", "quantity": 12, "notes": ""}
   ]
@@ -44,6 +46,8 @@ New registration: **201**. An identical successful retry: **200**, returning the
   "name": "John Henry",
   "churchId": "wpvlhc-aog",
   "rsvp": "yes",
+  "plusOne": true,
+  "plusOneName": "Jane Henry",
   "items": [
     {"foodItemId": "gala-food-034", "quantity": 12, "notes": "", "name": "Example dish", "unit": "servings"}
   ]
@@ -65,11 +69,35 @@ Guest creation, food reservation, contribution and receipt commit atomically. A 
 | `429 RATE_LIMITED` | Honor `Retry-After: 900`; limit is 500 validated attempts per observed IP per 15 minutes, including retries. |
 | `503 REGISTRATION_UNAVAILABLE` | The server-assigned church is missing or inactive; operator action is needed. |
 
-Registrations appear in the existing management list, attendance/food reports and CSVs. Existing `totals.invited` remains the count of active guest records, including these public registrations. Anonymous declines are not included. Names are **not identities**: a different request ID creates a new guest, even if the name already exists on an invitation. This protects existing invitations from being claimed or overwritten by name alone; it is not cross-device duplicate-person detection.
+Registrations appear in the existing management list, attendance/food reports and CSVs. Existing `totals.invited` remains the count of active primary guest records, including these public registrations. Use `totals.attendingPeople` for confirmed people including companions. Anonymous declines are not included. Names are **not identities**: a different request ID creates a new primary guest, even if the name already exists on an invitation. This protects existing invitations from being claimed or overwritten by name alone; it is not cross-device duplicate-person detection.
 
-## Personal invitation API flow
+## Named plus-one contract
 
-The backend continues to support personal invitation links, but the current public Jekyll page uses anonymous registration above and does not read or retrieve a guest by token. The code requirements below apply only to clients that intentionally use the personal invitation API; shared-link registration does not require a code.
+This is an additive backend change in API version 1.3.0. Deploy the API before sending these fields. The frontend developer handles the prompts: attendee's own name, whether they are bringing a plus-one, then the companion's name when Yes is selected. No UI files are changed by this backend update.
+
+The same companion fields are supported by `POST /registrations`, `POST /token/{token}/reply`, `POST /admin/guests`, `PATCH /admin/guests/{id}` and `POST /admin/guests/{id}/reply`:
+
+| Input | Meaning |
+| --- | --- |
+| `"plusOne":true,"plusOneName":"Jane Henry"` | Add or rename one companion; both fields required for this choice. |
+| `"plusOne":false` | No companion; clears any saved companion name. `plusOneName:""` may also be sent. |
+| Both omitted | On create, no companion. On an attending RSVP/admin update, preserve the saved companion. |
+
+`plusOne` must be a JSON boolean, not `"yes"`, `"true"` or a number. With `plusOne:true`, `plusOneName` must be a nonempty, already trimmed string of at most 160 characters; trim it before submitting. Names containing only whitespace fail. Sending the name without the flag, or a nonempty name with `plusOne:false`, returns `400 VALIDATION_ERROR`. A name-only update is not supported: resend `plusOne:true` with the corrected name.
+
+Declining through a personal-code or admin reply clears both fields, even when an older client omits them. `rsvp:"no"` with `plusOne:true` is invalid. Adding a companion through admin PATCH to an already declined guest also returns 400; use the admin reply endpoint to record `rsvp:"yes"` and the companion together. Pending admin-created invitations can record a companion, but neither person is counted as confirmed until the RSVP is Yes.
+
+`GET /token/{token}`, its `/status` endpoint, saved reply responses, registration receipts and admin guest list/detail/create/edit responses all include `plusOne` and `plusOneName`. Old records return `false` and `""` without a data migration. Companion details have the same private access as the primary guest; there is no public guest directory. Render both names as text, not HTML.
+
+The companion stays on the primary guest record: no second token, invitation, independent food reservation or gallery identity is created. Food quantities are still the explicitly selected amounts, never automatically doubled. The primary guest's `name` remains admin-only to edit after registration; public replies can edit only the companion name and existing RSVP/food fields.
+
+Companion details participate in registration retry matching. After success, changing the flag or companion name with the same `requestId` returns `409 REQUEST_CHANGED`; use the returned guest code for later edits. Omitting companion fields and explicitly sending `false`/`""` are equivalent, including for receipts created before this release. Old receipts return the added fields as `false`/`""`; replay never overwrites later companion changes.
+
+Overall and per-church reports add `plusOnes` (companions of active Yes replies) and `attendingPeople` (`yes + plusOnes`). For example, 10 confirmed primary guests with four companions means `yes:10`, `plusOnes:4`, `attendingPeople:14`. Existing invitation/RSVP/contributor counts keep their meanings. Guest CSVs append `Plus one` and `Plus-one name` columns, retaining one row per primary guest. The admin frontend must explicitly display the new fields/headcount; its existing Yes tile still counts primary registrations.
+
+## Personal invitation flow
+
+This existing flow remains supported. The code requirements below apply to personal invitation links; shared-link registration above does not require a code.
 
 1. Management creates a church, then a named person through `POST /admin/guests`. The server generates their code and `uniqueUrl`, for example `https://public-site.example/gala/?token=a1b2c3d4e5f678901234567`.
 2. The public page reads **`token`** from the query string and calls `GET /token/{token}`. Use returned `personalizedName` for the greeting and `name` for the person's full name. Render names/notes with `textContent`, not HTML.
@@ -78,22 +106,22 @@ The backend continues to support personal invitation links, but the current publ
 5. On a declined reply, submit immediately with `rsvp:"no", items:[]`. The current public UI hides the food form on decline, so **do not wait for that form's submit button** to save the declined response.
 6. Show success only after a successful HTTP response. Disable submission while saving; show server errors and permit retry. A repeat submission replaces choices without duplicate contributions. Reloading the invitation restores the latest saved state.
 
-One code represents **one person**. The public page cannot change the person's identity or church. `?name=` only changes the old demo greeting and is not an invitation credential. Codes are 24 lowercase hexadecimal characters and remain usable after a response until management deactivates the invitation. The chosen query form works with static Jekyll hosting and subpaths; the API itself uses URI parameters.
+One code represents **one primary attendee and their optional named plus-one**. The public page cannot change the primary person's identity or church. `?name=` only changes the old demo greeting and is not an invitation credential. Codes are 24 lowercase hexadecimal characters and remain usable after a response until management deactivates the invitation. The chosen query form works with static Jekyll hosting and subpaths; the API itself uses URI parameters.
 
 For missing/malformed codes, display an invitation-link message and do not submit anonymously. For unknown codes (404), inactive codes (410) or network failures, keep the form disabled until a valid invitation loads. No public directory of guests exists. Keep codes out of analytics, logs, third-party links and browser storage. The layout includes a no-referrer policy.
 
-**Current integration boundary:** `assets/js/site.js` loads menu options from `GET /food-items` and submits affirmative RSVPs to `POST /registrations` using the entered primary name, fetched food IDs and a private idempotency UUID. The page always greets visitors as “Dear friend” and does not read token query parameters. The optional plus-one name is not included in the API request or saved. Declines are not persisted by the anonymous registration endpoint.
+**Current integration boundary:** `assets/js/site.js` is the original local demo. It must be updated by the frontend developer. Its dish `value` strings from YAML are labels, not API IDs. Render the menu from `/food-items` or explicitly map fetched IDs; never send the label as `foodItemId`.
 
 ## Public endpoints
 
 | Method | Path | Success |
 | --- | --- | --- |
 | GET | `/ready` | 200, liveness only; no cross-origin browser access |
-| GET | `/token/{token}/status` | 200, name/greeting, `valid:true`, saved RSVP and response timestamp |
-| GET | `/token/{token}` | 200, person, church, RSVP and saved food choices |
+| GET | `/token/{token}/status` | 200, name/greeting, `valid:true`, saved RSVP, companion fields and response timestamp |
+| GET | `/token/{token}` | 200, person, church, RSVP, companion fields and saved food choices |
 | GET | `/food-items` | 200, `{foodItems:[{id,name,description,unit}]}`; active, unclaimed slots only |
-| POST | `/registrations` | 201 new attending guest, or 200 original receipt on identical retry; `{requestId,name,items}` |
-| POST | `/token/{token}/reply` | 200, saved `{token,rsvp,items}` |
+| POST | `/registrations` | 201 new attending guest, or 200 original receipt on identical retry; `{requestId,name,items,plusOne?,plusOneName?}` |
+| POST | `/token/{token}/reply` | 200, saved `{token,rsvp,plusOne,plusOneName,items}` |
 
 Invitation response example:
 
@@ -104,6 +132,8 @@ Invitation response example:
   "personalizedName": "Pastor Pat",
   "church": {"id": "wpvlhc-aog", "name": "World Prayer Vision Life Healing Center Assembly of God"},
   "rsvp": "pending",
+  "plusOne": false,
+  "plusOneName": "",
   "items": [],
   "respondedAt": null,
   "updatedAt": "2026-10-31T18:00:00.000Z"
@@ -115,6 +145,8 @@ Reply payload:
 ```json
 {
   "rsvp": "yes",
+  "plusOne": true,
+  "plusOneName": "Jane Henry",
   "items": [
     {"foodItemId": "gala-food-034", "quantity": 12, "notes": "Vegetarian"},
     {"foodItemId": "gala-food-136", "quantity": 20, "notes": ""}
@@ -167,15 +199,21 @@ document.querySelectorAll("[data-invitee]").forEach((node) => {
 
 // Call this only from the guest's reply/save event handler.
 // Convert quantity inputs using Number(input.value) when building selections.
-async function saveReply(rsvp, selections = []) {
+async function saveReply(rsvp, selections = [], companion) {
+  const companionFields = rsvp === "no" ? {plusOne: false} : companion === undefined ? {} : companion.plusOne ? {
+    plusOne: true, plusOneName: companion.plusOneName.trim(),
+  } : {plusOne: false};
   return publicApi(`/token/${encodeURIComponent(token)}/reply`, {
     rsvp,
+    ...companionFields,
     items: rsvp === "no" ? [] : selections.map(({foodItemId, quantity, notes}) => ({
       foodItemId, quantity, notes: (notes ?? "").trim(),
     })),
   });
 }
-// From the save handler: await saveReply("yes", selectedItems);
+// From the save handler: await saveReply("yes", selectedItems, {plusOne: true, plusOneName: companionName});
+// Explicitly remove the companion: await saveReply("yes", selectedItems, {plusOne: false});
+// Older clients may omit the third argument to preserve the saved companion.
 // From the decline handler: await saveReply("no");
 ```
 
@@ -197,12 +235,12 @@ The React app already consumes these endpoints. All paths below are prefixed wit
 | POST | `/food-items` | `{name,unit,description?,active?}` → 201 food item |
 | PATCH | `/food-items/{id}` | Nonempty subset of `name,unit,description,active` → item |
 | GET | `/guests` | `{guests:[...],nextCursor}`; query: `churchId,rsvp,limit,after` |
-| POST | `/guests` | `{name,churchId,personalizedName?,active?}` → 201 person, generated `token,uniqueUrl` |
+| POST | `/guests` | `{name,churchId,personalizedName?,active?,plusOne?,plusOneName?}` → 201 person, generated `token,uniqueUrl` |
 | GET | `/guests/{id}` | Person and saved `items`, including inactive invitations |
-| PATCH | `/guests/{id}` | Nonempty subset of `name,churchId,personalizedName,active` → person |
+| PATCH | `/guests/{id}` | Nonempty subset of `name,churchId,personalizedName,active,plusOne,plusOneName`; companion pairing rules apply |
 | POST | `/guests/{id}/reply` | Same reply payload as public API; correct response on behalf of person |
-| GET | `/reports/summary` | Overall/per-church RSVP counts, per-item quantities and detailed contributions |
-| GET | `/reports/guests.csv` | Guest CSV, including private invitation links |
+| GET | `/reports/summary` | Overall/per-church RSVP counts, `plusOnes`, `attendingPeople`, per-item quantities and detailed contributions |
+| GET | `/reports/guests.csv` | Guest CSV, including private invitation links and companion fields |
 | GET | `/reports/food.csv` | Food commitments by person, church, item, quantity/unit and notes |
 
 Every management mutation requires JSON plus `X-Admin-Request: true`, including login/logout. Use the same origin as the dashboard and `credentials:"same-origin"`; the session cookie is HttpOnly, Secure in production and SameSite=Strict. Do not read/store a JWT in JavaScript. Passwords are limited to 72 UTF-8 bytes because bcrypt uses that limit. Admin credentials are configured server-side.
@@ -223,7 +261,7 @@ IDs and URLs are server-generated and immutable. New/reassigned guests require a
 
 Deactivating a guest retains their food reservations. To also free those slots, record a declined reply or an empty food selection through the admin reply endpoint. The admin food list includes `claimedBy` (the owning guest code, or null); public food responses never expose it.
 
-Reports accept optional `?churchId=<id>` and reflect a consistent snapshot of active invitations. `yes`, `no` and `pending` add up to `invited`; `contributors` counts attending people with at least one food item. Food totals are per item/unit, never summed across unrelated units. `contributions` lists each person/item once. Church reassignment moves the person's report entries automatically. CSVs contain a UTF-8 BOM/CRLF, escaped cells and formula neutralization.
+Reports accept optional `?churchId=<id>` and reflect a consistent snapshot of active invitations. `yes`, `no` and `pending` add up to `invited`; these count primary guest records. `plusOnes` counts confirmed companions and `attendingPeople` is `yes + plusOnes`. `contributors` counts attending primary guests with at least one food item. Food totals are per item/unit, never summed across unrelated units or multiplied by companions. `contributions` lists each primary person/item once. Church reassignment moves both people's attendance and the primary person's commitments automatically. CSVs contain a UTF-8 BOM/CRLF, escaped cells and formula neutralization. Guest CSV columns are `Name, Church, RSVP, Invitation URL, Responded at, Plus one, Plus-one name`.
 
 ## Errors and limits
 
@@ -259,7 +297,7 @@ Public submissions allow 60 attempts per invitation per 15 minutes; admin login 
 
 ## Local handoff checklist
 
-Use the setup in [firebase/README.md](../firebase/README.md). Seed the church/menu and submit an anonymous RSVP from the Jekyll site. Check name validation, attending with and without food, idempotent retries, food-slot conflicts, that declines create no registration, and visible server errors. Personal-token clients should separately test the existing invitation API.
+Use the setup in [firebase/README.md](../firebase/README.md). Seed the church/menu, create a person from React management, and test the generated `?token=` link on the Jekyll site after wiring the forms. Check initial/repeat replies, attending without food, declining, restoring saved choices, inactive options/links and visible server errors. Public integration is complete only when management reports show the submitted changes.
 
 ## Photo gallery integration
 

@@ -4,9 +4,9 @@ For the local gallery, see [the gallery client guide](../gallery-client/README.m
 
 The gala uses Firebase Functions v2 (`api`, `us-central1`) with Node.js 24, Express 5, Joi, the Firestore Admin SDK, bcrypt and JWT cookie sessions. The management frontend is React + Vite in `admin-dashboard/`. Routes are under `/v1`; see [APISPECS](../api-spec/APISPECS.md) and [OpenAPI](../api-spec/openapi.json).
 
-The folder layout and versioned invitation endpoints follow the two reference applications. This application uses one person per code, permits response corrections, denies direct browser access to Firestore, and requires configured credentials without fallback passwords.
+The folder layout and versioned invitation endpoints follow the two reference applications. This application uses one named primary attendee per code with an optional named plus-one, permits response corrections, denies direct browser access to Firestore, and requires configured credentials without fallback passwords.
 
-Public shared-link signup is now supported by `POST /v1/registrations` with `{requestId,name,items}`. It registers an attending guest under the existing active `wpvlhc-aog` church and reserves their food slots in one transaction. Identical UUIDv4 request retries return the original receipt; later edits use the existing guest-code endpoints. Non-attending shared-link visitors create no record. See the [registration contract](../api-spec/APISPECS.md#shared-link-public-registration). No frontend changes, new secrets, environment variables or Firestore indexes are required. Deploy this backend update before the frontend calls the new endpoint; do not reseed existing production data for it.
+Public shared-link signup is supported by `POST /v1/registrations` with `{requestId,name,items,plusOne?,plusOneName?}`. It registers an attending guest under the existing active `wpvlhc-aog` church and reserves their food slots in one transaction. `plusOne:true` requires the companion's trimmed, nonempty name (maximum 160 characters). Identical UUIDv4 request retries return the original receipt; later edits use the existing guest-code endpoints. Non-attending shared-link visitors create no record. See the [registration contract](../api-spec/APISPECS.md#shared-link-public-registration) and [named plus-one rules](../api-spec/APISPECS.md#named-plus-one-contract). This is a backend update; the frontend developer must send/display the companion fields. No new secrets, environment variables, Firestore indexes or data migration are required. Deploy the API before sending the new fields; do not reseed existing production data for it.
 
 ## Local setup
 
@@ -77,7 +77,7 @@ Credentials, PUBLIC_SITE_URL and ALLOWED_ORIGINS are required. In production, `P
 | Collection | Document ID | Contents |
 | --- | --- | --- |
 | `Churches` | Server ID; seed: `wpvlhc-aog` | `name`, `active`, `createdAt`, `updatedAt` |
-| `InvitedGuests` | Server-generated 24-character lowercase hexadecimal invitation code | `name`, `personalizedName`, `churchId`, `active`, `rsvp` (`pending`, `yes`, `no`), `respondedAt`, `createdAt`, `updatedAt` |
+| `InvitedGuests` | Server-generated 24-character lowercase hexadecimal invitation code | `name`, `personalizedName`, `churchId`, `active`, `rsvp` (`pending`, `yes`, `no`), `plusOne`, `plusOneName`, optional `registrationSource:"public"`, `respondedAt`, `createdAt`, `updatedAt` |
 | `FoodItems` | Server ID; seeds: `gala-food-001` etc. | `name`, `description`, `unit`, `active`, `hasContributions`, `claimedBy` (guest code or null), `createdAt`, `updatedAt` |
 | `FoodContributions` | Same code as the person | `guestId`, `items: [{foodItemId, name, unit, quantity, notes}]`, `updatedAt` |
 | `PublicRegistrationRequests` | SHA-256 of event and canonical private UUIDv4 request ID | Input fingerprint, original registration receipt (including guest code), `createdAt`; server-only, retained for idempotent retries |
@@ -88,13 +88,15 @@ Timestamps are Firestore server timestamps internally and ISO 8601 UTC strings i
 
 RSVP and contributions are replaced in one transaction. Declining requires an empty `items` array; an attending person may also bring nothing. A person may select at most 30 distinct items, with integer quantities of 1–10,000 and notes of at most 500 characters per item. An item's unit is permanently locked after its first contribution, preventing mixed-unit reports. Inactive items may remain in an existing commitment at the same/reduced quantity.
 
+Companion fields update in the same transaction as the RSVP and food choices. `plusOne:true` requires `plusOneName`; `plusOne:false` clears it. Omit both on an attending update to preserve the saved companion, including for older clients. Declining clears both fields and rejects an explicit plus-one. Admin create/PATCH supports the same pair; a declined guest must first be marked attending through the admin reply endpoint before a companion can be added. Old records and receipts return `plusOne:false, plusOneName:""`. No-companion request fingerprints remain compatible with pre-upgrade registration retries. The companion stays on the primary record without a separate code, food claim or gallery identity.
+
 Each food record is a single-person slot. Reserving it atomically removes it from the public menu; another person receives `409 FOOD_ITEM_TAKEN`. Removing it from a reply or declining releases it. Owners can revise their quantities without reserving it twice. Deactivating an invitation retains its recorded commitments; clear its reply if you also want to release the slots.
 
 Use `PATCH {"active":false}` instead of deletion. Inactive guests return 410 publicly and are excluded from reports; reactivation restores their recorded responses/contributions. Inactive churches keep existing invitations and reports but cannot receive new or reassigned guests. Inactive food options disappear from the public catalogue and retain commitments. Management can correct responses on inactive guest records.
 
 ## Reports and access
 
-Reports read a consistent Firestore snapshot. They count active invitations and contributions from attending people, grouped by the person's current church. Quantities retain each food item's unit. CSVs use UTF-8 with BOM, quotes and CRLF and neutralize spreadsheet formulas. Guest exports contain private invitation URLs.
+Reports read a consistent Firestore snapshot. Existing RSVP counts cover active primary guest records. Overall/per-church `plusOnes` counts companions of active Yes replies; `attendingPeople=yes+plusOnes` is the confirmed headcount. Pending, declined and inactive records add no confirmed companions. Contributor counts and food quantities are unchanged and grouped by the primary person's current church. CSVs use UTF-8 with BOM, quotes and CRLF and neutralize spreadsheet formulas. Guest exports contain private invitation URLs and append `Plus one` and `Plus-one name` columns. The admin UI must adopt the new fields explicitly; its existing Yes count remains primary registrations.
 
 Admin sessions use an 8-hour `__session` HttpOnly cookie, SameSite=Strict, Secure in production. Hosting rewrites `/v1/**` to the function, keeping administration same-origin. Every admin mutation, including login/logout, requires JSON and `X-Admin-Request: true`. Logout clears the browser cookie; copied JWTs expire naturally. Rotate `ADMIN_JWT_SECRET` and redeploy to invalidate all sessions.
 

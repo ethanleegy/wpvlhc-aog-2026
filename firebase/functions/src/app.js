@@ -88,6 +88,8 @@ function createApp({ getDb, getConfig, logger = console, galleryStorageFactory }
         personalizedName: guest.personalizedName,
         valid: true,
         rsvp: guest.rsvp,
+        plusOne: guest.plusOne,
+        plusOneName: guest.plusOneName,
         respondedAt: guest.respondedAt,
       });
     },

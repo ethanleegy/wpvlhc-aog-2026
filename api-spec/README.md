@@ -1,6 +1,6 @@
 # API specifications
 
-- [APISPECS.md](APISPECS.md): frontend API handoff, including the new shared-link public registration endpoint alongside the existing invitation flow, endpoint tables, payload examples and errors.
+- [APISPECS.md](APISPECS.md): frontend API handoff, including shared-link public registration, named plus-ones and confirmed headcounts alongside the existing invitation flow, endpoint tables, payload examples and errors.
 - [openapi.json](openapi.json): OpenAPI 3.0.3 contract for all 44 public, management and Worker-internal operations, including public registration and the gallery. Import into Swagger Editor or an API client.
 - [Cloudflare gallery handover](CLOUDFLARE_GALLERY_HANDOVER.md): current backend context, QR/photo flow, mobile compression, free-tier constraints and planning questions for the next chat. Gallery endpoints in it are proposals, not part of the implemented API.
 - [Gallery architecture draft](GALLERY_ARCHITECTURE_DRAFT.md): proposal for seamless guest sharing, automatic publication, bulk hide/show and device compression, with a revised Cloudflare $0 design using private R2 buckets, controlled image delivery and usage cutoffs. The core flow is implemented locally; account headroom and production cutoff behaviour must be verified before deployment.

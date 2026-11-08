@@ -11,11 +11,26 @@ const foodFields = {
   description: text(500).allow(""),
   active: Joi.boolean(),
 };
+const plusOneFields = {
+  plusOne: Joi.boolean(),
+  plusOneName: Joi.when("plusOne", {
+    is: true,
+    then: text(160).required(),
+    otherwise: Joi.string().valid(""),
+  }),
+};
+// Updates omit both fields to preserve the saved companion; no defaults here.
+function checkPlusOne(value, helpers) {
+  return value.plusOne === undefined && value.plusOneName !== undefined
+    ? helpers.error("any.invalid")
+    : value;
+}
 const guestFields = {
   name: text(160),
   personalizedName: text(160).allow(""),
   churchId: id,
   active: Joi.boolean(),
+  ...plusOneFields,
 };
 const replyItems = Joi.array()
   .max(30)
@@ -56,20 +71,22 @@ const schemas = {
     churchId: id.required(),
     personalizedName: guestFields.personalizedName.default(""),
     active: guestFields.active.default(true),
-  }),
-  guestPatch: Joi.object(guestFields).min(1),
+  }).custom(checkPlusOne),
+  guestPatch: Joi.object(guestFields).min(1).custom(checkPlusOne),
   registration: Joi.object({
     requestId: Joi.string()
       .pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
       .required(),
     name: guestFields.name.required(),
+    ...plusOneFields,
     items: replyItems,
-  }),
+  }).custom(checkPlusOne),
   reply: Joi.object({
     rsvp: Joi.string().valid("yes", "no").required(),
+    ...plusOneFields,
     items: replyItems,
-  }).custom((value, helpers) =>
-    value.rsvp === "no" && value.items.length
+  }).custom(checkPlusOne).custom((value, helpers) =>
+    value.rsvp === "no" && (value.items.length || value.plusOne === true)
       ? helpers.error("any.invalid")
       : value,
   ),

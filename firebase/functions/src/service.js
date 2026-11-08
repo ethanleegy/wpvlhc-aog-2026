@@ -19,9 +19,14 @@ function serial(value) {
 function record(doc) {
   return serial({ id: doc.id, ...doc.data() });
 }
+function plusOneDetails(value) {
+  const plusOne = value.plusOne === true;
+  return { plusOne, plusOneName: plusOne ? value.plusOneName : "" };
+}
 function adminGuest(doc, config) {
   return {
     ...record(doc),
+    ...plusOneDetails(doc.data()),
     token: doc.id,
     uniqueUrl: inviteUrl(config.siteUrl, doc.id),
   };
@@ -100,6 +105,7 @@ function createService(db, config) {
           personalizedName: guest.personalizedName || guest.name,
           church: { id: guest.churchId, name: church.data()?.name || "" },
           rsvp: guest.rsvp,
+          ...plusOneDetails(guest),
           items: contribution.data()?.items || [],
           respondedAt: guest.respondedAt,
           updatedAt: guest.updatedAt,
@@ -122,18 +128,21 @@ function createService(db, config) {
       if (!admin) assertActive(guest);
       const previous = previousDoc.data()?.items || [];
       const selection = await prepareFoodSelection(tx, token, payload.items, previous);
+      const companion = plusOneDetails(payload.rsvp === "no" ? {} : payload.plusOne === undefined ? guest : payload);
       const now = FieldValue.serverTimestamp();
       tx.update(guestRef, {
         rsvp: payload.rsvp,
+        ...companion,
         respondedAt: now,
         updatedAt: now,
       });
       writeFoodSelection(tx, token, selection, now);
-      return { token, rsvp: payload.rsvp, items: selection.items };
+      return { token, rsvp: payload.rsvp, ...companion, items: selection.items };
     });
   }
 
   async function registerGuest(payload) {
+    const companion = plusOneDetails(payload);
     const requestKey = createHash("sha256")
       .update(`gala-2026:registration:${payload.requestId.toLowerCase()}`)
       .digest("hex");
@@ -143,6 +152,8 @@ function createService(db, config) {
         items: payload.items
           .map(({ foodItemId, quantity, notes }) => ({ foodItemId, quantity, notes }))
           .sort((a, b) => a.foodItemId.localeCompare(b.foodItemId)),
+        // Keep the original no-companion fingerprint valid across this release.
+        ...(companion.plusOne ? companion : {}),
       }))
       .digest("hex");
     const requestRef = registrationRequests.doc(requestKey);
@@ -154,7 +165,8 @@ function createService(db, config) {
         if (prior.data().fingerprint !== fingerprint)
           throw new ApiError(409, "REQUEST_CHANGED", "This request ID already belongs to a different registration. Use the guest code to update the saved response.");
         // Return the original receipt without overwriting subsequent RSVP/admin edits.
-        return { created: false, registration: prior.data().registration };
+        const receipt = prior.data().registration;
+        return { created: false, registration: { ...receipt, ...plusOneDetails(receipt) } };
       }
       const church = await tx.get(churches.doc(churchId));
       if (!church.exists || !church.data().active)
@@ -162,11 +174,12 @@ function createService(db, config) {
       const selection = await prepareFoodSelection(tx, token, payload.items);
       const now = FieldValue.serverTimestamp();
       const registration = {
-        token, name: payload.name, churchId, rsvp: "yes", items: selection.items,
+        token, name: payload.name, churchId, rsvp: "yes", ...companion, items: selection.items,
       };
       tx.create(guests.doc(token), {
         name: payload.name, personalizedName: "", churchId, active: true,
         rsvp: "yes", registrationSource: "public",
+        ...companion,
         respondedAt: now, createdAt: now, updatedAt: now,
       });
       writeFoodSelection(tx, token, selection, now);
@@ -187,6 +200,7 @@ function createService(db, config) {
       const now = FieldValue.serverTimestamp();
       tx.create(guests.doc(token), {
         ...payload,
+        ...plusOneDetails(payload),
         rsvp: "pending",
         respondedAt: null,
         createdAt: now,
@@ -199,6 +213,10 @@ function createService(db, config) {
   async function patchGuest(id, payload) {
     await db.runTransaction(async (tx) => {
       const current = requireRecord(await tx.get(guests.doc(id)), "Guest");
+      if (current.rsvp === "no" && payload.plusOne === true)
+        throw new ApiError(400, "VALIDATION_ERROR", "Record an attending RSVP before adding a plus-one.", [
+          { field: "plusOne", message: "A declined guest cannot bring a plus-one." },
+        ]);
       if (payload.churchId && payload.churchId !== current.churchId) {
         const church = requireRecord(
           await tx.get(churches.doc(payload.churchId)),
@@ -209,6 +227,7 @@ function createService(db, config) {
       }
       tx.update(guests.doc(id), {
         ...payload,
+        ...(payload.plusOne === undefined ? {} : plusOneDetails(payload)),
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
@@ -347,6 +366,8 @@ function buildReport(data, churchId) {
       no: 0,
       pending: 0,
       contributors: 0,
+      plusOnes: 0,
+      attendingPeople: 0,
     }));
   const churchMap = new Map(
     churchRows.map((church) => [church.churchId, church]),
@@ -357,13 +378,21 @@ function buildReport(data, churchId) {
     no: 0,
     pending: 0,
     contributors: 0,
+    plusOnes: 0,
+    attendingPeople: 0,
   };
   for (const guest of guests) {
     totals[guest.rsvp] += 1;
+    const plusOnes = guest.rsvp === "yes" && guest.plusOne === true ? 1 : 0;
+    const attendingPeople = guest.rsvp === "yes" ? 1 + plusOnes : 0;
+    totals.plusOnes += plusOnes;
+    totals.attendingPeople += attendingPeople;
     const church = churchMap.get(guest.churchId);
     if (church) {
       church.invited += 1;
       church[guest.rsvp] += 1;
+      church.plusOnes += plusOnes;
+      church.attendingPeople += attendingPeople;
     }
   }
   const foods = data.foodItems.map((food) => ({
@@ -403,6 +432,7 @@ function buildReport(data, churchId) {
   }
   const detailedGuests = guests.map((guest) => ({
     ...guest,
+    ...plusOneDetails(guest),
     churchName: churchMap.get(guest.churchId)?.name || "",
   }));
   return {
