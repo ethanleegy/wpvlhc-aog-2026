@@ -586,9 +586,6 @@
   .border-\[\#fffaf1\]\/55 {
     border-color: color-mix(in oklab, #fffaf1 55%, transparent);
   }
-  .border-\[\#fffaf1\]\/65 {
-    border-color: color-mix(in oklab, #fffaf1 65%, transparent);
-  }
   .border-forest {
     border-color: var(--color-forest);
   }
@@ -788,6 +785,15 @@
   .text-\[20px\] {
     font-size: 20px;
   }
+  .text-\[22px\] {
+    font-size: 22px;
+  }
+  .text-\[24px\] {
+    font-size: 24px;
+  }
+  .text-\[25px\] {
+    font-size: 25px;
+  }
   .text-\[30px\] {
     font-size: 30px;
   }
@@ -940,6 +946,9 @@
   .text-\[\#e8d5a9\] {
     color: #e8d5a9;
   }
+  .text-\[\#e06858\] {
+    color: #e06858;
+  }
   .text-\[\#fffaf1\] {
     color: #fffaf1;
   }
@@ -1064,9 +1073,6 @@
     .hover\:bg-\[\#f0dfb8\]:hover {
       background-color: #f0dfb8;
     }
-    .hover\:bg-\[\#fffaf1\]:hover {
-      background-color: #fffaf1;
-    }
     .hover\:bg-forest:hover {
       background-color: var(--color-forest);
     }
@@ -1080,9 +1086,6 @@
     }
     .hover\:text-\[\#fffaf1\]:hover {
       color: #fffaf1;
-    }
-    .hover\:text-forest:hover {
-      color: var(--color-forest);
     }
   }
   .focus-visible\:outline-2:focus-visible {
@@ -1293,6 +1296,34 @@
 .submit-response {
   margin: 2rem auto;
 }
+.hero-gold {
+  color: #ffe28a;
+  background-image: linear-gradient(110deg, #f8d96f 0%, #fff4bd 22%, #d8a82b 42%, #fff3ae 56%, #f0cb55 76%, #fff0a0 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: hero-gold-shine 6s ease-in-out infinite;
+}
+.hero-invite {
+  border-color: #b74438;
+  background-color: #a9362e;
+  color: #fffaf1;
+  transition: background-color 700ms ease, border-color 700ms ease, color 700ms ease;
+}
+.hero-invite:hover {
+  border-color: #d7b87d;
+  background-color: #8f2d27;
+  color: #fffaf1;
+}
+@keyframes hero-gold-shine {
+  0%, 15% {
+    background-position: 100% 50%;
+  }
+  70%, 100% {
+    background-position: 0% 50%;
+  }
+}
 .gallery-masonry {
   columns: 2;
   column-gap: 0.75rem;
@@ -1414,6 +1445,9 @@ html[data-scroll-animations="ready"] [data-scroll-visible="true"] {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .hero-gold {
+    animation: none;
+  }
   html[data-scroll-animations="ready"] [data-scroll-reveal] {
     opacity: 1;
     transform: none;
