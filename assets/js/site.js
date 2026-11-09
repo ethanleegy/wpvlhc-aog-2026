@@ -29,7 +29,7 @@ function initializeScrollReveals() {
       entry.target.dataset.scrollVisible = "true";
       observer.unobserve(entry.target);
     });
-  }, { threshold: 0.30, rootMargin: "0px 0px -20% 0px" });
+  }, { threshold: 0.20, rootMargin: "0px 0px -20% 0px" });
 
   revealItems.forEach((item) => observer.observe(item));
 }
@@ -183,35 +183,45 @@ async function loadFoodItems() {
 
 if (rsvpForm && dishForm) {
   loadFoodItems();
-  rsvpForm.addEventListener("change", (event) => {
-    if (event.target.name === "plusOneChoice") {
-      const bringingPlusOne = plusOneYesRadio.checked;
-      plusOneDetails.hidden = !bringingPlusOne;
-      plusOneNameInput.required = bringingPlusOne;
-      if (!bringingPlusOne) plusOneNameInput.value = "";
-      return;
-    }
+  const updatePlusOneDetails = () => {
+    const bringingPlusOne = plusOneYesRadio.checked;
+    plusOneDetails.hidden = !bringingPlusOne;
+    plusOneNameInput.required = bringingPlusOne;
+    if (!bringingPlusOne) plusOneNameInput.value = "";
+  };
 
-    if (event.target.name !== "attendance") return;
-    const attending = event.target.value === "yes";
+  const updateAttendanceDetails = (showMessage = true) => {
+    const attending = rsvpForm.querySelector('input[name="attendance"]:checked')?.value === "yes";
     guestDetails.hidden = !attending;
     bringSection.hidden = !attending;
     submitWrapper.hidden = !attending;
     contributionPrompt.hidden = !attending;
-    rsvpMessage.textContent = attending ? "" : "Maybe next time";
+    if (showMessage) rsvpMessage.textContent = attending ? "" : "Maybe next time";
 
     if (!attending) {
       dishForm.reset();
       updateDishCount();
       plusOneNoRadio.checked = true;
-      plusOneDetails.hidden = true;
-      plusOneNameInput.required = false;
-      plusOneNameInput.value = "";
     }
+    updatePlusOneDetails();
+  };
+
+  rsvpForm.addEventListener("change", (event) => {
+    if (event.target.name === "plusOneChoice") {
+      updatePlusOneDetails();
+      return;
+    }
+
+    if (event.target.name === "attendance") updateAttendanceDetails();
   });
 
   rsvpForm.addEventListener("submit", submitResponse);
   dishForm.addEventListener("change", updateDishCount);
+  rsvpForm.addEventListener("reset", () => {
+    requestAnimationFrame(() => updateAttendanceDetails(false));
+  });
+  window.addEventListener("pageshow", () => updateAttendanceDetails(false));
+  updateAttendanceDetails(false);
 }
 
 //START Submit RSVP Response

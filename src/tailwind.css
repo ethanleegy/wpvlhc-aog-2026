@@ -76,16 +76,32 @@ html[data-scroll-animations="ready"] [data-scroll-visible="true"] {
   transition-delay: 200ms;
 }
 
+#event-details > [data-scroll-reveal] {
+  transition-duration: 1200ms;
+}
+
+#event-details[data-scroll-reveal] {
+  transition-duration: 1200ms;
+}
+
 #invitation-title[data-scroll-visible="true"] img {
   animation: mistletoe-rock 600ms ease-in-out both;
   transform-origin: 50% 90%;
 }
 
+.hero-title-line {
+  position: relative;
+  isolation: isolate;
+}
+
 .santa-hat {
+  position: absolute;
+  z-index: -1;
+  top: -0.32em;
+  left: -0.08em;
   display: inline-block;
-  width: 1em;
-  height: 1em;
-  vertical-align: -0.1em;
+  width: 0.6em;
+  height: 0.6em;
   transform-origin: 50% 90%;
   animation: mistletoe-rock 600ms ease-in-out 1s both;
 }
@@ -96,6 +112,21 @@ html[data-scroll-animations="ready"] [data-scroll-visible="true"] {
   40% { rotate: 7deg; }
   60% { rotate: -7deg; }
   80% { rotate: 7deg; }
+}
+
+.thank-you-ivory {
+  animation: thank-you-rise 2000ms cubic-bezier(.22, 1, .36, 1) 1s both;
+}
+
+@keyframes thank-you-rise {
+  from {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 767px) {
@@ -130,6 +161,10 @@ html[data-scroll-animations="ready"] [data-scroll-visible="true"] {
   }
 
   .santa-hat {
+    animation: none;
+  }
+
+  .thank-you-ivory {
     animation: none;
   }
 }
