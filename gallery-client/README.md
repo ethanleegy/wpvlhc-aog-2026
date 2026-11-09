@@ -1,4 +1,4 @@
-# Gallery browser client
+# Christmas Social gallery browser client
 
 The guest sharing interface and admin queue share the same browser compression library. The uploading device produces metadata-free JPEG/WebP variants: thumbnail up to 400 px / 50,000 bytes, display up to 1,600 px / 500,000 bytes. Orientation is applied before encoding. Source files stay on the device. HEIC conversion is lazy-loaded only when native decoding cannot open the image; it still runs locally.
 

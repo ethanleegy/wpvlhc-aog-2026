@@ -2,7 +2,7 @@
 
 Date: November 4, 2026. Repository snapshot: `6f8d171` on `main`.
 
-We are adding a mobile photo gallery to the WPVLHC AOG Christmas Gala application. Guests should scan a QR code, take a photo or select existing pictures, and upload them. Church management must be able to view every submitted photo, with approval and denial under consideration. Our team owns storage, hosting, ingestion and retrieval; the frontend developer will build the public gallery display against our API.
+We are adding a mobile photo gallery to the WPVLHC AOG Christmas Social application. Guests should scan a QR code, take a photo or select existing pictures, and upload them. Church management must be able to view every submitted photo, with approval and denial under consideration. Our team owns storage, hosting, ingestion and retrieval; the frontend developer will build the public gallery display against our API.
 
 **The next chat should plan the approach with the user before implementation.** Cloudflare free-tier usage and strong mobile compression are requirements. The architecture, compression thresholds, moderation policy and endpoint designs below are planning inputs. Gallery routes are not part of the current implemented API.
 

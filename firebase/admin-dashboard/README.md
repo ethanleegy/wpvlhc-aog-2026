@@ -1,6 +1,8 @@
-# Gala management dashboard
+# Christmas Social management dashboard
 
-React + Vite management for WPVLHC AOG's December 2026 Christmas Gala. Uses the Node/Firestore backend in `../functions`; it contains no browser Firestore SDK, database credentials or stored admin password.
+React + Vite management for WPVLHC AOG's December 2026 Christmas Social. Uses the Node/Firestore backend in `../functions`; it contains no browser Firestore SDK, database credentials or stored admin password.
+
+This naming update covers documentation and the backend. Frontend source branding, browser-generated `gala-*.csv` filenames and `GALA_TEST_*` test variables remain unchanged. Direct backend CSV downloads now use `christmas-social-guests.csv` and `christmas-social-food.csv`.
 
 ## Development
 

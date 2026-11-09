@@ -1,6 +1,6 @@
-# Frontend API handoff · Christmas Gala
+# Frontend API handoff · Christmas Social
 
-The complete machine-readable contract is [openapi.json](openapi.json), OpenAPI 3.0.3. This document explains how to connect the existing Jekyll UI. Stack: Node.js 24, Express 5, Joi, Firebase Functions v2 and Firestore.
+The complete machine-readable contract is [openapi.json](openapi.json), OpenAPI 3.0.3. The event display name is **Christmas Social 2026**; deployed domains, event/storage keys and food IDs keep their existing technical spelling for compatibility. This document explains how to connect the existing Jekyll UI. Stack: Node.js 24, Express 5, Joi, Firebase Functions v2 and Firestore.
 
 ## Base URLs
 
@@ -100,7 +100,7 @@ Overall and per-church reports add `plusOnes` (companions of active Yes replies)
 
 This existing flow remains supported. The code requirements below apply to personal invitation links; shared-link registration above does not require a code.
 
-1. Management creates a church, then a named person through `POST /admin/guests`. The server generates their code and `uniqueUrl`, for example `https://public-site.example/gala/?token=a1b2c3d4e5f678901234567`.
+1. Management creates a church, then a named person through `POST /admin/guests`. The server generates their code and `uniqueUrl`, for example `https://public-site.example/christmas-social/?token=a1b2c3d4e5f678901234567`.
 2. The public page reads **`token`** from the query string and calls `GET /token/{token}`. Use returned `personalizedName` for the greeting and `name` for the person's full name. Render names/notes with `textContent`, not HTML.
 3. Fetch `GET /food-items` for current menu IDs, labels, descriptions and units. Each record is a single-person slot; repeated names have different IDs and must be rendered separately. Claimed slots disappear from this list, including the guest's own slots. Restore saved selections from the invitation's `items` array, which includes their name/unit.
 4. On an attending reply, submit `POST /token/{token}/reply` with `rsvp:"yes"` and the complete food choices. The guest may bring nothing: `items:[]` is valid.
@@ -267,7 +267,7 @@ IDs and URLs are server-generated and immutable. New/reassigned guests require a
 
 Deactivating a guest retains their food reservations. To also free those slots, record a declined reply or an empty food selection through the admin reply endpoint. The admin food list includes `claimedBy` (the owning guest code, or null); public food responses never expose it.
 
-Reports accept optional `?churchId=<id>` and reflect a consistent snapshot of active invitations. `yes`, `no` and `pending` add up to `invited`; these count primary guest records. `plusOnes` counts confirmed companions and `attendingPeople` is `yes + plusOnes`. `contributors` counts attending primary guests with at least one food item. Food totals are per item/unit, never summed across unrelated units or multiplied by companions. `contributions` lists each primary person/item once. Church reassignment moves both people's attendance and the primary person's commitments automatically. CSVs contain a UTF-8 BOM/CRLF, escaped cells and formula neutralization. Guest CSV columns are `Name, Church, RSVP, Invitation URL, Responded at, Plus one, Plus-one name`.
+Reports accept optional `?churchId=<id>` and reflect a consistent snapshot of active invitations. `yes`, `no` and `pending` add up to `invited`; these count primary guest records. `plusOnes` counts confirmed companions and `attendingPeople` is `yes + plusOnes`. `contributors` counts attending primary guests with at least one food item. Food totals are per item/unit, never summed across unrelated units or multiplied by companions. `contributions` lists each primary person/item once. Church reassignment moves both people's attendance and the primary person's commitments automatically. CSVs contain a UTF-8 BOM/CRLF, escaped cells and formula neutralization. Direct backend downloads are named `christmas-social-guests.csv` and `christmas-social-food.csv`. Guest CSV columns are `Name, Church, RSVP, Invitation URL, Responded at, Plus one, Plus-one name`. Browser-generated React exports retain their existing frontend filenames in this backend-only rename.
 
 ## Food import and permanent deletion
 

@@ -21,7 +21,7 @@ const config = {
   username: "testadmin",
   passwordHash: bcrypt.hashSync("integration-only", 4),
   jwtSecret: "test-secret-only-".repeat(4),
-  siteUrl: "http://localhost:3000/gala/",
+  siteUrl: "http://localhost:3000/christmas-social/",
   origins: ["http://localhost:5173", "http://localhost:3000"],
 };
 const mutate = (method, path, body, client = agent) =>
@@ -115,7 +115,7 @@ test("church and food creation; personal links cannot be supplied or guessed fro
   assert.match(guest.token, /^[a-f0-9]{24}$/);
   assert.equal(
     guest.uniqueUrl,
-    `http://localhost:3000/gala/?token=${guest.token}`,
+    `http://localhost:3000/christmas-social/?token=${guest.token}`,
   );
   await mutate("post", "/admin/guests", {
     name: "Name",
@@ -301,7 +301,10 @@ test("admin replies, pagination, church reassignment, reports, CSV and disabling
     .get(`/v1/admin/reports/food.csv?churchId=${churchB.id}`)
     .expect(200);
   assert.match(csv.headers["content-type"], /text\/csv/);
+  assert.equal(csv.headers["content-disposition"], 'attachment; filename="christmas-social-food.csv"');
   assert.ok(csv.text.includes("'=HYPERLINK"));
+  const peopleCsv = await agent.get(`/v1/admin/reports/guests.csv?churchId=${churchB.id}`).expect(200);
+  assert.equal(peopleCsv.headers["content-disposition"], 'attachment; filename="christmas-social-guests.csv"');
   await mutate("patch", `/admin/guests/${guest.id}`, { active: false }).expect(
     200,
   );

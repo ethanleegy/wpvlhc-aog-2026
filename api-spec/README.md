@@ -1,4 +1,4 @@
-# API specifications
+# Christmas Social API specifications
 
 - [APISPECS.md](APISPECS.md): frontend API handoff, including shared-link public registration, named plus-ones and confirmed headcounts alongside the existing invitation flow, endpoint tables, payload examples and errors.
 - [openapi.json](openapi.json): OpenAPI 3.0.3 contract for all 49 public, management and Worker-internal operations, including public registration, food import/deletion, people deletion and the gallery. Import into Swagger Editor or an API client.

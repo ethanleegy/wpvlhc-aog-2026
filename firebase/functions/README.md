@@ -1,6 +1,8 @@
-# Functions API
+# Christmas Social Functions API
 
 Node.js 24, CommonJS, Firebase Functions v2, Express 5, Joi and Firestore Admin SDK.
+
+The event is Christmas Social 2026. Backend CSV downloads are named `christmas-social-guests.csv` and `christmas-social-food.csv`. Persistent event IDs, storage paths and retry-key namespaces retain their deployed values; see the [event naming note](../../README.md).
 
 - `index.js`: HTTPS function and Secret Manager bindings.
 - `src/app.js`: `/v1` public and `/v1/admin` management routes, middleware and errors.

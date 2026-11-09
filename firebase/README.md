@@ -2,7 +2,7 @@
 
 For the local gallery, see [the gallery client guide](../gallery-client/README.md). `npm run gallery:local` from the repository root starts isolated demo Firestore, the API, local R2/Worker, the guest uploader and management together. Gallery routes are disabled in existing deployments until explicitly configured; the Cloudflare $0 account review is a separate launch prerequisite.
 
-The gala uses Firebase Functions v2 (`api`, `us-central1`) with Node.js 24, Express 5, Joi, the Firestore Admin SDK, bcrypt and JWT cookie sessions. The management frontend is React + Vite in `admin-dashboard/`. Routes are under `/v1`; see [APISPECS](../api-spec/APISPECS.md) and [OpenAPI](../api-spec/openapi.json).
+The Christmas Social uses Firebase Functions v2 (`api`, `us-central1`) with Node.js 24, Express 5, Joi, the Firestore Admin SDK, bcrypt and JWT cookie sessions. The management frontend is React + Vite in `admin-dashboard/`. Routes are under `/v1`; see [APISPECS](../api-spec/APISPECS.md) and [OpenAPI](../api-spec/openapi.json).
 
 The folder layout and versioned invitation endpoints follow the two reference applications. This application uses one named primary attendee per code with an optional named plus-one, permits response corrections, denies direct browser access to Firestore, and requires configured credentials without fallback passwords.
 

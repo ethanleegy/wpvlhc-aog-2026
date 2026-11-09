@@ -1,8 +1,10 @@
-# Gallery Worker
+# Christmas Social gallery Worker
 
 For the full production sequence and a plain-language breakdown, use the [production deployment runbook](../../api-spec/PROD_DEPLOYMENT_README.md).
 
-Local R2 development and controlled upload/image delivery for the gala. Compression runs in the browser. Run the full local system from the repository root with `npm run gallery:local`; it creates only demo Firestore data, local R2 objects and temporary local secrets.
+Local R2 development and controlled upload/image delivery for the Christmas Social. Compression runs in the browser. Run the full local system from the repository root with `npm run gallery:local`; it creates only demo Firestore data, local R2 objects and temporary local secrets.
+
+The existing Worker/bucket names, public hostname and `gala-2026` object paths are deployed technical identifiers. They stay unchanged for Christmas Social so stored photos, signatures and configured origins remain valid.
 
 `npm run check` builds a deployment dry run. It does not upload a Worker or create buckets. The development configuration deliberately has an empty cost-review expiry and localhost API URL; it cannot serve production uploads/images as shipped.
 

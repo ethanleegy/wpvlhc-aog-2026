@@ -255,8 +255,8 @@ function createApp({ getDb, getConfig, logger = console, galleryStorageFactory }
     },
   );
   for (const [path, filename, formatter] of [
-    ["guests.csv", "gala-guests.csv", guestCsv],
-    ["food.csv", "gala-food.csv", foodCsv],
+    ["guests.csv", "christmas-social-guests.csv", guestCsv],
+    ["food.csv", "christmas-social-food.csv", foodCsv],
   ]) {
     admin.get(
       `/reports/${path}`,

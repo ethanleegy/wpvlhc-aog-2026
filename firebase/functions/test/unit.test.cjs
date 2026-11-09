@@ -65,8 +65,8 @@ test("replies require explicit quantities, unique known-shaped IDs and consisten
 test("invitation URLs preserve the static site's subpath without accepting a client identity", () => {
   const token = "a".repeat(24);
   assert.equal(
-    inviteUrl("https://example.org/gala/", token),
-    `https://example.org/gala/?token=${token}`,
+    inviteUrl("https://example.org/christmas-social/", token),
+    `https://example.org/christmas-social/?token=${token}`,
   );
   assert.throws(
     () =>
@@ -239,7 +239,7 @@ test("production has no default credentials or insecure cookie mode", () => {
     ADMIN_USERNAME: "admin",
     ADMIN_PASSWORD_HASH: bcrypt.hashSync("unit-test-only", 4),
     ADMIN_JWT_SECRET: "x".repeat(40),
-    PUBLIC_SITE_URL: "https://example.org/gala/",
+    PUBLIC_SITE_URL: "https://example.org/christmas-social/",
     ALLOWED_ORIGINS: "https://admin.example.org",
   };
   assert.equal(loadConfig(env).local, false);
@@ -268,7 +268,7 @@ test("production allows explicit HTTP loopback origins without enabling local co
     ADMIN_USERNAME: "admin",
     ADMIN_PASSWORD_HASH: bcrypt.hashSync("unit-test-only", 4),
     ADMIN_JWT_SECRET: "x".repeat(40),
-    PUBLIC_SITE_URL: "https://example.org/gala/",
+    PUBLIC_SITE_URL: "https://example.org/christmas-social/",
     ALLOWED_ORIGINS: origins.join(","),
   };
   const config = loadConfig(env);

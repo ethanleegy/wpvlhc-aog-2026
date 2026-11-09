@@ -1,4 +1,4 @@
-// Client menu: two independent contribution slots per item, except five for water.
+// Christmas Social 2026 menu: two contribution slots per item, except five for water.
 // Each quantity is measured in the stated unit; repeated names are separate slots.
 const menu = [
   { name: "Baked fish in cheese sauce", unit: "trays", description: "Tray of baked fish topped with cheese sauce, ready to serve." },
@@ -47,6 +47,7 @@ const menu = [
 
 const foodSlots = menu.flatMap(({ name, unit, description, slots }) => {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  // These deployed IDs stay stable so reseeding after the rename cannot add duplicates.
   return Array.from({ length: slots }, (_, index) => ({
     id: `gala-food-${slug}-${String(index + 1).padStart(2, "0")}`,
     name, unit, description,

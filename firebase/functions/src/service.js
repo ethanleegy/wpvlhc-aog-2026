@@ -49,6 +49,7 @@ function createService(db, config) {
 
   async function importFoods(payload) {
     const fingerprint = createHash("sha256").update(JSON.stringify(payload.items.map(({ name, unit, description, active }) => ({ name, unit, description, active })))).digest("hex");
+    // Persisted retry namespace for Christmas Social; changing it would duplicate imports.
     const key = createHash("sha256").update(`gala-2026:food-import:${payload.requestId.toLowerCase()}`).digest("hex");
     const receiptRef = foodImportRequests.doc(key);
     const refs = payload.items.map(() => foods.doc());
@@ -221,6 +222,7 @@ function createService(db, config) {
 
   async function registerGuest(payload) {
     const companion = plusOneDetails(payload);
+    // Keep deployed request keys stable when changing the event's display name.
     const requestKey = createHash("sha256")
       .update(`gala-2026:registration:${payload.requestId.toLowerCase()}`)
       .digest("hex");

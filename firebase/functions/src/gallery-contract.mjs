@@ -1,3 +1,4 @@
+// Deployed data/R2 namespace for Christmas Social 2026; keep stable across branding changes.
 export const EVENT = "gala-2026";
 export const VARIANTS = ["thumbnail", "display"];
 export const LIMITS = Object.freeze({

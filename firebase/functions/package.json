@@ -2,7 +2,7 @@
   "name": "wpvlhc-functions",
   "private": true,
   "version": "1.0.0",
-  "description": "Christmas Gala invitations, RSVP, food contributions and church management API",
+  "description": "Christmas Social invitations, RSVP, food contributions and church management API",
   "main": "index.js",
   "engines": {
     "node": "24"

@@ -2,6 +2,7 @@ import { verifyCapability } from "../../../firebase/functions/src/gallery-contra
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const fail = (status, code, message) => json({ error: { code, message } }, status);
+// Christmas Social uses the existing object namespace so deployed photos remain accessible.
 const keyPattern = /^(staging|retained|published)\/gala-2026\/[a-f0-9]{32}\/[A-Za-z0-9_-]{1,80}\/(thumbnail|display)$/;
 function bucket(env, name) {
   if (name === "private") return env.PRIVATE;

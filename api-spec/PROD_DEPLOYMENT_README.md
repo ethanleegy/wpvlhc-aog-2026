@@ -1,10 +1,12 @@
-# Gallery production deployment
+# Christmas Social gallery production deployment
 
-Updated 5 November 2026. This is the operator runbook for the gallery. Follow the sections in order and run commands from the directory stated above each block. The examples use the existing `wpvlhc-aog-2026` Firebase project and public gala domain; confirm the actual targets before deploying.
+Updated 5 November 2026. This is the operator runbook for the gallery. Follow the sections in order and run commands from the directory stated above each block. The examples use the existing `wpvlhc-aog-2026` Firebase project and public Christmas Social domain; confirm the actual targets before deploying.
 
 The two review findings have been fixed: guest authorization now restores/renews the session on share, retry and resume; expired admin thumbnails request a fresh link, with at most one automatic refresh per photo per minute. Production account configuration and live acceptance are separate release steps. No production deployment was performed while preparing this guide.
 
 Printable companion: [deployment and readiness PDF](../output/pdf/Gallery_Deployment_and_Readiness_Guide.pdf).
+
+The event is named **Christmas Social**. Existing hostnames, Worker/bucket names and `gala-2026` storage/database keys below retain their deployed spelling; they are not display branding. Frontend source and the historical printable PDF are separate from this documentation/backend naming update.
 
 ## Verified local result
 
@@ -217,7 +219,7 @@ Wait for gallery indexes to finish building in Firestore before smoke testing qu
 
 The production guest page defaults to `https://wpvlhc-aog-2026.web.app/v1`. If using a different API, set `data-api-base` on the `#gallery-app` element in `gallery/upload/index.html`, then rebuild. Do not point production at the local API.
 
-Confirm `CNAME`, DNS, HTTPS and Jekyll's production `url`, `domain` and `baseurl`. `_config.yml` currently contains the old GitHub URL; update the production URL metadata for the real gala domain before publishing. The gallery asset build assumes root hosting at `/assets/gallery/`; a subpath needs matching build/template configuration.
+Confirm `CNAME`, DNS, HTTPS and Jekyll's production `url`, `domain` and `baseurl`. `_config.yml` currently contains the old GitHub URL; update the production URL metadata for the real Christmas Social domain before publishing. The gallery asset build assumes root hosting at `/assets/gallery/`; a subpath needs matching build/template configuration.
 
 Working directory: repository root.
 

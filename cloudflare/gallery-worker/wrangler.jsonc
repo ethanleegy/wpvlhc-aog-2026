@@ -1,5 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Deployed Christmas Social resources retain their existing technical names.
   "name": "wpvlhc-gala-gallery",
   "main": "src/worker.mjs",
   "compatibility_date": "2026-08-01",

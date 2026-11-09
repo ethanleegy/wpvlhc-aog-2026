@@ -2,7 +2,7 @@
 
 Date: November 4, 2026. Status: proposal for review before implementation. Cost review requires controlled image delivery in place of direct public bucket access.
 
-Guests upload photos during the gala, and management can upload a large batch after the event. Guest photos become publicly visible automatically after technical validation by default. Management can hide or show them afterward, individually or in bulk, and can switch on approval before publication if needed. Both upload experiences compress photos on the uploading device. Firebase manages permissions, records and moderation; Cloudflare R2 stores the compressed files. A Worker on the Free plan gates uploads and image delivery, with caching and no image encoding. The required Cloudflare charge is $0: pause work at limits rather than enable paid capacity.
+Guests upload photos during the Christmas Social, and management can upload a large batch after the event. Guest photos become publicly visible automatically after technical validation by default. Management can hide or show them afterward, individually or in bulk, and can switch on approval before publication if needed. Both upload experiences compress photos on the uploading device. Firebase manages permissions, records and moderation; Cloudflare R2 stores the compressed files. A Worker on the Free plan gates uploads and image delivery, with caching and no image encoding. The required Cloudflare charge is $0: pause work at limits rather than enable paid capacity.
 
 This proposal extends [the gallery handover](CLOUDFLARE_GALLERY_HANDOVER.md). The device compression decision supersedes its server encoding proposal. Endpoint names and limits below are drafts, not implemented API contracts. Existing invitations, RSVP, food reservations and admin authentication retain their current behaviour.
 
@@ -113,7 +113,7 @@ Selecting 2,000 files must not decode 2,000 files or retain every compressed fil
 
 After a reload, browsers may require the admin to select the source files again. Resume means matching the selection to saved progress and uploading unfinished items; it does not promise unattended work after the tab closes or the device sleeps. File names, sizes and modification times help match selections, while compressed-byte digests confirm exact retries. Exact duplicate detection does not identify visually similar photos or guarantee the same encoding across different devices.
 
-The guest upload window can close after the gala while authenticated admin uploads remain open. Admin uploads bypass guest/session allowances, but share the event storage and photo caps. A large batch does not reserve capacity for every selected source at once.
+The guest upload window can close after the Christmas Social while authenticated admin uploads remain open. Admin uploads bypass guest/session allowances, but share the event storage and photo caps. A large batch does not reserve capacity for every selected source at once.
 
 ## Upload authorization and validation
 
