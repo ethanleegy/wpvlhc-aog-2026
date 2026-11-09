@@ -7,31 +7,34 @@ permalink: /
   <section class="relative min-h-[min(810px,94svh)] overflow-hidden bg-[#27382f] text-[#fffaf1] max-md:min-h-[min(760px,92svh)]" aria-labelledby="hero-title">
     <img
       class="absolute inset-0 size-full object-cover object-[center_56%] max-md:object-[57%_center]"
-      src="{{ '/assets/images/dining-hall.jpg' | relative_url }}"
+      src="{{ '/assets/images/dining-hall.png' | relative_url }}"
       alt="A warmly lit dining room set for an elegant dinner"
       fetchpriority="high"
     >
-    <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(20,30,25,.68)_0%,rgba(20,30,25,.28)_55%,rgba(20,30,25,.14)_100%),linear-gradient(0deg,rgba(20,30,25,.48)_0%,transparent_42%,rgba(20,30,25,.23)_100%)]"></div>
+    <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(20,30,25,.74)_0%,rgba(20,30,25,.38)_55%,rgba(20,30,25,.22)_100%),linear-gradient(0deg,rgba(20,30,25,.55)_0%,transparent_42%,rgba(20,30,25,.3)_100%)]"></div>
     <div class="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-[clamp(22px,6vw,88px)] py-7 max-md:px-[22px] max-md:py-[23px]" style="z-index: 20">
-      <a class="inline-flex items-center gap-3 text-[15px] font-semibold tracking-[.14em] text-[#fffaf1] uppercase max-md:gap-2 max-md:text-[9px]" href="#invitation" aria-label="Christmas Social 2026 invitation">
+      <a class="inline-flex items-center gap-3 text-[15px] font-semibold tracking-[.14em] text-[#fffaf1] uppercase max-md:gap-2 max-md:text-[12px]" href="#invitation" aria-label="Christmas Social 2026 invitation">
         <img class="size-6" src="{{ '/assets/images/favicon-16x16.png' | relative_url }}" alt="" aria-hidden="true">
-        <span>World Prayer Vision Life Healing Center</br>Assembly of God</span>
+        <span>WPVLHC</span>
       </a>
       <a class="inline-flex items-center gap-[9px] border-b border-[#fffaf1]/55 pb-[5px] text-[10px] font-semibold tracking-[.14em] text-[#fffaf1] uppercase max-md:text-[9px]" href="{{ '/gallery/' | relative_url }}">View gallery <span aria-hidden="true">↗</span></a>
     </div>
     <div class="relative z-10 mx-auto flex min-h-[min(810px,94svh)] max-w-[1240px] flex-col items-start justify-center px-[8vw] pt-[120px] pb-[110px] max-md:min-h-[min(760px,92svh)] max-md:px-[25px] max-md:pt-[125px] max-md:pb-[105px]">
-      <p class="mb-6 text-[10px] leading-[1.5] font-bold tracking-[.22em] text-[#e8d5a9] uppercase">An evening of warmth &amp; wonder</p>
-      <h1 id="hero-title" class="m-0 font-display text-[clamp(28px,9.4vw,120px)] leading-[.82] font-normal tracking-[-.075em]"><span class="block whitespace-nowrap">Christmas Social</span><em class="block font-normal text-[#e5c992]">2026</em></h1>
+      <p class="mb-2 font-sans text-[20px] leading-[1.5] font-semibold tracking-[.2em] text-[#e8d5a9] uppercase max-md:text-[15px]">World Prayer Vision Life Healing Center</p>
+      <h1 id="hero-title" class="m-0 font-display text-[clamp(54px,11vw,138px)] leading-[.78] font-normal tracking-[-.075em]">
+        <span class="block tracking-[-0.04em]">Christmas Social <em class="font-normal tracking-[-.08em] text-[#e5c992] text-[1.2em]">2026</em><img id="santa-hat" class="santa-hat" src="{{ '/assets/images/santa-hat.svg' | relative_url }}" alt="" aria-hidden="true"></span>
+      </h1>
       <p class="mt-8 mb-[30px] font-display text-[clamp(16px,2vw,21px)] tracking-[.02em]">Sunday, December 13 <span class="px-2 text-[#e5c992]" aria-hidden="true">·</span> 6 pm</p>
-      <a style="display: none" class="show-page inline-flex items-center gap-14 border border-[#fffaf1]/65 px-9 py-7 text-[20px] font-bold tracking-[.15em] text-[#fffaf1] uppercase transition-colors hover:bg-[#fffaf1] hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red max-md:gap-4 max-md:px-5 max-md:py-5 max-md:text-xs" href="#invitation">You’re invited <span aria-hidden="true">↓</span></a>
+      <a style="display: none; transition-duration: 500ms; transition-timing-function: ease-in-out" class="show-page inline-flex items-center gap-14 border border-[#fffaf1]/65 px-9 py-7 text-[20px] font-bold tracking-[.15em] text-[#fffaf1] uppercase transition-colors hover:bg-[#fffaf1] hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red max-md:gap-4 max-md:px-5 max-md:py-5 max-md:text-xs" href="#invitation">You’re invited <span aria-hidden="true">↓</span></a>
     </div>
   </section>
 
-  <section style="display: none; background-image: url('{{ '/assets/images/falling-snowflakes.png' | relative_url }}'), linear-gradient(to bottom, rgba(215,184,125,0.2) 0%, rgba(215,184,125,0) 100%); background-size: cover, cover; background-position: center top, center; background-repeat: no-repeat, no-repeat" class="show-page bg-paper px-6 py-28 max-md:px-[22px] max-md:py-[82px]" id="invitation" aria-labelledby="invitation-title">
-    <div class="mx-auto w-full max-w-[990px]">
+  <section style="display: none; background-image: linear-gradient(to bottom, rgba(215,184,125,0.2) 0%, rgba(215,184,125,0) 100%);" class="show-page relative isolate overflow-hidden bg-paper px-6 py-28 max-md:px-[22px] max-md:py-[82px]" id="invitation" aria-labelledby="invitation-title">
+    <div class="pointer-events-none absolute inset-0 z-0" aria-hidden="true" style="background-image: url('{{ '/assets/images/falling-snowflakes.png' | relative_url }}'); background-size: 1000px 2000px; background-repeat: repeat; background-attachment: fixed"></div>
+    <div class="relative z-10 mx-auto w-full max-w-[990px]">
       <div class="mx-auto max-w-[710px] text-center">
         <p class="mb-[19px] text-[10px] leading-[1.5] font-bold tracking-[.22em] text-red uppercase">A little note for you</p>
-        <h2 id="invitation-title" class="m-0 mb-[17px] flex items-center justify-center gap-2 font-display text-[clamp(45px,7vw,76px)] leading-none font-normal tracking-[-.055em]">
+        <h2 id="invitation-title" data-scroll-reveal="up" class="m-0 mb-[17px] flex items-center justify-center gap-2 font-display text-[clamp(45px,7vw,76px)] leading-none font-normal tracking-[-.055em]">
           <img class="object-contain" style="width: clamp(48px, 8vw, 60px); height: clamp(36px, 6.4vw, 48px)" src="{{ '/assets/images/mistletoe.svg' | relative_url }}" alt="" aria-hidden="true">
           <span>Dear <span class="text-red italic">friend</span>,</span>
           <img class="-scale-x-100 object-contain" style="width: clamp(48px, 8vw, 60px); height: clamp(36px, 6.4vw, 48px)" src="{{ '/assets/images/mistletoe.svg' | relative_url }}" alt="" aria-hidden="true">
@@ -39,20 +42,20 @@ permalink: /
         <p class="mx-auto max-w-[580px] font-display text-lg leading-[1.7] text-[#66675f]">The season is brighter when we celebrate together. Join us for a festive evening of good food, familiar faces, and Christmas joy.</p>
       </div>
 
-      <div class="my-[60px] grid grid-cols-1 border-y border-[#182b23] max-md:my-[42px] md:my-[60px] md:grid-cols-3">
-        <div class="flex min-h-[112px] flex-col justify-center border-b border-[#d7d1c5] px-[30px] py-[17px] text-center last:border-b-0 md:min-h-[145px] md:border-b-0 md:px-[30px] md:py-[22px] md:[&+div]:border-l">
+      <div id="event-details" data-scroll-reveal="right" class="my-[60px] grid grid-cols-1 border-y border-[#182b23] max-md:my-[42px] md:my-[60px] md:grid-cols-3">
+        <div data-scroll-reveal="up" class="flex min-h-[112px] flex-col justify-center border-b border-[#d7d1c5] px-[30px] py-[17px] text-center last:border-b-0 md:min-h-[145px] md:border-b-0 md:px-[30px] md:py-[22px] md:[&+div]:border-l">
           <svg class="mx-auto mb-[10px] text-red" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M7.5 3.5v3M16.5 3.5v3M3.5 9h17M8 13h2M14 13h2M8 16.5h2"/></svg>
           <span class="mb-[10px] text-[9px] font-bold tracking-[.2em] text-red uppercase">When</span>
           <span class="font-display text-lg">Sunday, December 13, 2026</span>
           <span class="mt-1 text-[11px] text-muted">Dinner begins at 6:00 PM</span>
         </div>
-        <div class="flex min-h-[112px] flex-col justify-center border-b border-[#d7d1c5] px-[30px] py-[17px] text-center last:border-b-0 md:min-h-[145px] md:border-b-0 md:px-[30px] md:py-[22px] md:[&+div]:border-l">
+        <div data-scroll-reveal="up" class="flex min-h-[112px] flex-col justify-center border-b border-[#d7d1c5] px-[30px] py-[17px] text-center last:border-b-0 md:min-h-[145px] md:border-b-0 md:px-[30px] md:py-[22px] md:[&+div]:border-l">
           <svg class="mx-auto mb-[10px] text-red" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.25"/></svg>
           <span class="mb-[10px] text-[9px] font-bold tracking-[.2em] text-red uppercase">Where</span>
           <span class="font-display text-lg">Olive Sandra Cummings Hall, </br> WPVLHC Building</span>
           <span class="mt-1 text-[11px] text-muted">Church Street, Anna Catherina, Guyana</span>
         </div>
-        <div class="flex min-h-[112px] flex-col justify-center px-[30px] py-[17px] text-center md:min-h-[145px] md:px-[30px] md:py-[22px] md:border-l md:border-[#d7d1c5]">
+        <div data-scroll-reveal="up" class="flex min-h-[112px] flex-col justify-center px-[30px] py-[17px] text-center md:min-h-[145px] md:px-[30px] md:py-[22px] md:border-l md:border-[#d7d1c5]">
           <svg class="mx-auto mb-[10px] text-red" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 4 4 2 4-2 4 2 2 4-4 2v8H6v-8l-4-2 2-4 4-2Z"/><path d="M8 4c0 2 1.8 3.5 4 3.5S16 6 16 4M6 12h3m6 0h3"/></svg>
           <span class="mb-[10px] text-[9px] font-bold tracking-[.2em] text-red uppercase">What to wear</span>
           <span class="font-display text-lg">Festive Wear</span>
@@ -100,7 +103,7 @@ permalink: /
           </div>
         </fieldset>
         <p class="mt-4 min-h-6 text-[13px] leading-[1.5] text-forest" id="rsvp-message" aria-live="polite"></p>
-        <a class="inline-flex max-w-full flex-wrap items-center justify-center gap-4 border border-forest px-9 py-7 text-center text-[8px] font-bold tracking-[.15em] text-forest uppercase transition-colors hover:bg-forest hover:text-[#fffaf1] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red" id="contribution-prompt" href="#bring" hidden>
+        <a style="transition-duration: 500ms; transition-timing-function: ease-in-out" class="inline-flex max-w-full flex-wrap items-center justify-center gap-4 border border-forest px-9 py-7 text-center text-[8px] font-bold tracking-[.15em] text-forest uppercase transition-colors hover:bg-forest hover:text-[#fffaf1] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red" id="contribution-prompt" href="#bring" hidden>
           <span class="text-[12px] leading-3">Please select your contribution below</span>
           <span aria-hidden="true">↓</span>
         </a>
@@ -108,8 +111,8 @@ permalink: /
     </div>
   </section>
 
-  <section class="relative isolate bg-forest px-6 py-28 text-[#fffaf1] max-md:px-[22px] max-md:py-[82px]" id="bring" hidden aria-labelledby="bring-title">
-    <img class="pointer-events-none absolute inset-0 z-0 size-full object-cover" src="{{ '/assets/images/falling-snowflakes.png' | relative_url }}" alt="" aria-hidden="true" style="opacity: 0.18; filter: brightness(0) saturate(100%) invert(79%) sepia(25%) saturate(683%) hue-rotate(3deg) brightness(90%) contrast(84%)">
+  <section class="relative isolate overflow-hidden bg-forest px-6 py-28 text-[#fffaf1] max-md:px-[22px] max-md:py-[82px]" id="bring" hidden aria-labelledby="bring-title">
+    <div class="pointer-events-none absolute inset-0 z-0" aria-hidden="true" style="background-image: url('{{ '/assets/images/falling-snowflakes.png' | relative_url }}'); background-size: 1000px 2000px; background-repeat: repeat; background-attachment: fixed; opacity: 0.18; filter: brightness(0) saturate(100%) invert(79%) sepia(25%) saturate(683%) hue-rotate(3deg) brightness(90%) contrast(84%)"></div>
     <div class="relative z-10 mx-auto w-full max-w-[1100px]">
       <div class="mb-[55px] grid grid-cols-2 items-end gap-x-12 max-md:mb-[38px] max-md:grid-cols-1 max-md:gap-5">
         <p class="col-span-full mb-[18px] text-[10px] leading-[1.5] font-bold tracking-[.22em] text-gold uppercase max-md:col-span-1 max-md:mb-0">A seat at the table</p>

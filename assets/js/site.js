@@ -1,6 +1,6 @@
 const baseUrl = "https://us-central1-wpvlhc-aog-2026.cloudfunctions.net/api/v1/";
 const invitationSections = document.querySelectorAll(".show-page");
-if (invitationSections.length) setTimeout(showPage, 500);
+if (invitationSections.length) setTimeout(showPage, 100);
 
 function showPage() {
   const showPages = document.querySelectorAll(".show-page");
@@ -8,7 +8,83 @@ function showPage() {
   showPages.forEach((page) => {
     page.style.display = "block";
   });
+
+  initializeScrollReveals();
 }
+
+function initializeScrollReveals() {
+  const revealItems = document.querySelectorAll("[data-scroll-reveal]");
+  if (
+    !revealItems.length
+    || !("IntersectionObserver" in window)
+    || window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    return;
+  }
+
+  document.documentElement.dataset.scrollAnimations = "ready";
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.dataset.scrollVisible = "true";
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.30, rootMargin: "0px 0px -20% 0px" });
+
+  revealItems.forEach((item) => observer.observe(item));
+}
+
+let anchorScrollFrame = 0;
+const cancelAnchorScroll = () => {
+  if (!anchorScrollFrame) return;
+  cancelAnimationFrame(anchorScrollFrame);
+  anchorScrollFrame = 0;
+};
+
+document.querySelectorAll('a[href="#invitation"], a[href="#bring"]').forEach((link) => {
+  link.addEventListener("click", (event) => {
+    const target = document.querySelector(link.getAttribute("href"));
+    if (!target) return;
+
+    event.preventDefault();
+    cancelAnchorScroll();
+    history.pushState(null, "", link.getAttribute("href"));
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      target.scrollIntoView();
+      return;
+    }
+
+    const startY = window.scrollY;
+    const distance = target.getBoundingClientRect().top;
+    const duration = Math.min(Math.max(Math.abs(distance) * 0.75, 800), 1800);
+    const startTime = performance.now();
+
+    const animateScroll = (time) => {
+      const progress = Math.min((time - startTime) / duration, 1);
+      const easedProgress = progress < 0.5
+        ? 4 * progress ** 3
+        : 1 - ((-2 * progress + 2) ** 3) / 2;
+      window.scrollTo(0, startY + distance * easedProgress);
+
+      if (progress < 1) {
+        anchorScrollFrame = requestAnimationFrame(animateScroll);
+      } else {
+        anchorScrollFrame = 0;
+      }
+    };
+
+    anchorScrollFrame = requestAnimationFrame(animateScroll);
+  });
+});
+
+window.addEventListener("wheel", cancelAnchorScroll, { passive: true });
+window.addEventListener("touchstart", cancelAnchorScroll, { passive: true });
+window.addEventListener("keydown", (event) => {
+  if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "].includes(event.key)) {
+    cancelAnchorScroll();
+  }
+});
 
 const rsvpForm = document.querySelector("#rsvp");
 const bringSection = document.querySelector("#bring");
