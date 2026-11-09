@@ -10,7 +10,6 @@ test("management creates an invitation, records food, exports reports and signs 
       "Set GALA_TEST_USERNAME and GALA_TEST_PASSWORD for the local demo emulator only",
     );
   const suffix = Date.now().toString(36);
-  const churchName = `Demo church ${suffix}`;
   const guestName = `Demo guest ${suffix}`;
   const foodName = `Demo food ${suffix}`;
   const browserErrors = [];
@@ -23,15 +22,8 @@ test("management creates an invitation, records food, exports reports and signs 
     page.getByRole("heading", { name: "Overview", exact: true }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Churches", exact: false }).click();
-  await page.getByRole("button", { name: "Add church +" }).click();
-  let dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Name", { exact: true }).fill(churchName);
-  await dialog.getByRole("button", { name: "Save changes" }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(
-    page.getByRole("cell", { name: churchName, exact: true }),
-  ).toBeVisible();
+  const initialComing = Number(await page.locator(".stat").filter({ hasText: "People coming" }).locator("strong").textContent());
+  let dialog;
 
   await page
     .getByRole("button", { name: "Food & drinks", exact: false })
@@ -44,14 +36,12 @@ test("management creates an invitation, records food, exports reports and signs 
   await dialog.getByRole("button", { name: "Save changes" }).click();
   await expect(dialog).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Invitations", exact: false }).click();
-  await page.getByRole("button", { name: "Add invitation +" }).click();
+  await page.getByRole("button", { name: "People", exact: false }).click();
+  await page.getByRole("button", { name: "Add person +" }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("Name", { exact: true }).fill(guestName);
   await dialog.getByLabel("Personal greeting").fill("Pastor Demo");
-  await dialog
-    .getByRole("combobox", { name: "Church", exact: true })
-    .selectOption({ label: churchName });
+  await expect(dialog.getByRole("combobox", { name: "Church", exact: true })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Save changes" }).click();
   await expect(dialog).toHaveCount(0);
   let row = page.getByRole("row").filter({ hasText: guestName });
@@ -85,24 +75,22 @@ test("management creates an invitation, records food, exports reports and signs 
   expect(saved.items[0].quantity).toBe(12);
 
   await page
-    .getByRole("button", { name: "Contributions", exact: false })
+    .getByRole("button", { name: "Who is bringing what", exact: false })
     .click();
-  await page
-    .getByRole("combobox", { name: "Church", exact: true })
-    .selectOption({ label: churchName });
   row = page.getByRole("row").filter({ hasText: guestName });
   await expect(row).toContainText(foodName);
-  await expect(row).toContainText("12 servings");
+  await expect(row.getByRole("cell", { name: "12", exact: true })).toBeVisible();
+  await expect(row.getByRole("cell", { name: "servings", exact: true })).toBeVisible();
   const downloadEvent = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Food report ↓" }).click();
+  await page.getByRole("button", { name: "Export contributions ↓" }).click();
   const download = await downloadEvent;
-  expect(download.suggestedFilename()).toBe("gala-food.csv");
+  expect(download.suggestedFilename()).toBe("gala-contributions.csv");
   expect(await download.failure()).toBeNull();
 
   await page.getByRole("button", { name: "Overview", exact: false }).click();
   await expect(
-    page.locator(".stat").filter({ hasText: "Attending" }).locator("strong"),
-  ).toHaveText("1");
+    page.locator(".stat").filter({ hasText: "People coming" }).locator("strong"),
+  ).toHaveText(String(initialComing + 1));
   await page.screenshot({
     path: "test-results/management-desktop.png",
     fullPage: true,

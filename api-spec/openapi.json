@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "WPVLHC AOG Christmas Gala API",
-    "version": "1.3.0",
+    "version": "1.5.0",
     "description": "Node.js 24 + Express 5 + Joi + Firestore. Public shared-link registration, invitation flows and authenticated church administration. All timestamps are UTC ISO 8601 strings. All non-health responses use Cache-Control: private, no-store. No direct client Firestore access."
   },
   "servers": [
@@ -130,7 +130,7 @@
         "summary": "Register an attending guest, optional named companion and food choices",
         "operationId": "postRegistration",
         "security": [],
-        "description": "Public shared-link signup; no admin login or invitation code. Server fixes churchId=wpvlhc-aog, rsvp=yes, active=true and registrationSource=public. Creates guest, contribution, slot reservations and private idempotency receipt in one transaction. A rejected slot creates no partial registration. Reuse a private UUIDv4 requestId with identical information for safe retries; changed information with a completed ID returns 409 REQUEST_CHANGED. Object-field order, food-selection order and omitted/empty notes do not change the request identity. A new UUID means a new person, even for an equal name. Non-attending shared-link visitors do not call this endpoint and create no record. Limited to 500 validated attempts per observed IP per 15 minutes, including retries, to accommodate shared Wi-Fi. Existing invitation/admin/gallery routes remain available. Optional plusOne=true requires plusOneName; one companion maximum, stored on the primary guest without another token, food reservation or gallery identity. Companion changes after successful registration return REQUEST_CHANGED; edit via the existing token reply route. Omitted and explicit false/empty companion fields share the pre-upgrade retry identity.",
+        "description": "Public shared-link signup; no admin login or invitation code. Server fixes churchId=wpvlhc-aog, rsvp=yes, active=true and registrationSource=public. Creates guest, contribution, slot reservations and private idempotency receipt in one transaction. A rejected slot creates no partial registration. Reuse a private UUIDv4 requestId with identical information for safe retries; changed information with a completed ID returns 409 REQUEST_CHANGED. Object-field order, food-selection order and omitted/empty notes do not change the request identity. A new UUID means a new person, even for an equal name. Non-attending shared-link visitors do not call this endpoint and create no record. Limited to 500 validated attempts per observed IP per 15 minutes, including retries, to accommodate shared Wi-Fi. Existing invitation/admin/gallery routes remain available. Optional plusOne=true requires plusOneName; one companion maximum, stored on the primary guest without another token, food reservation or gallery identity. Companion changes after successful registration return REQUEST_CHANGED; edit via the existing token reply route. Omitted and explicit false/empty companion fields share the pre-upgrade retry identity. Management deletion redacts the saved receipt; a matching old request ID then returns 410 REGISTRATION_DELETED instead of replaying it.",
         "requestBody": {
           "required": true,
           "content": {
@@ -266,6 +266,16 @@
           },
           "503": {
             "description": "REGISTRATION_UNAVAILABLE: the server-assigned church is missing or inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "REGISTRATION_DELETED: management permanently deleted this registration. An identical old request ID cannot retrieve the previous receipt or recreate the person. A deliberate new registration needs a new request ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1793,6 +1803,133 @@
             }
           }
         }
+      },
+      "delete": {
+        "operationId": "deleteAdminFoodItemsId",
+        "summary": "Permanently delete one food item and its guest choices",
+        "tags": [
+          "Management"
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,80}$"
+            }
+          },
+          {
+            "name": "X-Admin-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          }
+        ],
+        "description": "Admin-only, JSON body {} for an unused item. Current selections require confirmation=\"delete\"; otherwise 409 FOOD_DELETE_CONFIRMATION_REQUIRED without changes. Removes the item and all matching food choices, including inactive/legacy guest records, atomically. Preserves attendance, companions and other choices. Missing IDs are reported as already absent, making retries safe. The affected guests updatedAt changes, respondedAt stays unchanged. Historical registration/import receipts are not rewritten. At most 200 affected contribution records per transaction; otherwise 409 DELETE_TOO_LARGE. No automatic notification is sent to guests.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoodDeleteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodDeleteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid fields or confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Admin sign-in required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origin rejected or X-Admin-Request header missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Confirmation required, changed retry contents or deletion too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 32 KB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use Content-Type: application/json, including DELETE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server/configuration failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/admin/guests": {
@@ -2324,6 +2461,133 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/GuestPatch"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAdminGuestsId",
+        "summary": "Permanently delete a person, their plus-one and contributions",
+        "tags": [
+          "Management"
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          },
+          {
+            "name": "X-Admin-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          }
+        ],
+        "description": "Admin-only permanent deletion. JSON confirmation=\"delete\" is required for every person, including pending/inactive records. Deletes the guest (including their companion) and their canonical FoodContributions document, releases all food claims owned by the guest, and redacts matching public-registration receipts in one transaction. The food catalogue, active flags and permanent hasContributions unit locks are preserved. Old invitation links/replies return 404. Identical original registration retries return 410 REGISTRATION_DELETED and cannot recreate the person or reveal their old receipt. Only the fingerprint and deletedAt remain in a server-only retry tombstone. Missing IDs are safe to retry and orphan contributions/claims are cleaned too. Unrelated guests and anonymous gallery photos are unaffected; no notifications are sent. Operations exceeding an application limit of 450 writes return DELETE_TOO_LARGE without changes. No new indexes or migration are required.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuestDeleteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestDeleteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid fields or confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Admin sign-in required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origin rejected or X-Admin-Request header missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "GUEST_DELETE_CONFIRMATION_REQUIRED or DELETE_TOO_LARGE; no changes occur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 32 KB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use Content-Type: application/json, including DELETE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server/configuration failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -6259,6 +6523,376 @@
           }
         }
       }
+    },
+    "/admin/food-items/bulk-delete": {
+      "post": {
+        "operationId": "postAdminFoodItemsBulkDelete",
+        "summary": "Delete up to 50 food items atomically",
+        "tags": [
+          "Management"
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Admin-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          }
+        ],
+        "description": "Same confirmation and cleanup rules as single deletion. If any current selection exists, confirmation=\"delete\" is required for the entire batch. No changes occur on rejection. Larger UI selections are sent in bounded batches; completed batches remain deleted if a later one fails. Missing IDs are safe to retry.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoodBulkDeleteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodDeleteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid fields or confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Admin sign-in required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origin rejected or X-Admin-Request header missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Confirmation required, changed retry contents or deletion too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 32 KB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use Content-Type: application/json, including DELETE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server/configuration failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/food-items/import": {
+      "post": {
+        "operationId": "postAdminFoodItemsImport",
+        "summary": "Add up to 10 food slots with retry protection",
+        "tags": [
+          "Management"
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Admin-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          }
+        ],
+        "description": "Admin-only JSON import batch, not a raw CSV upload. The browser parses and validates the entire CSV before sending batches. Creates one new unclaimed slot per input row; duplicate dish names are supported. Never updates existing slots or imports claimedBy/hasContributions/IDs. Guest selections remain unchanged. Same UUIDv4 and normalized row contents replay the original receipt with 200; new writes return 201. Reordered object keys/default description and active fields are normalized; row order is significant. A new request ID intentionally creates new slots. Replaying after deletion returns the original IDs without resurrecting deleted slots.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoodImportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original receipt replayed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodImportReceipt"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodImportReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid fields or confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Admin sign-in required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origin rejected or X-Admin-Request header missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Confirmation required, changed retry contents or deletion too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 32 KB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use Content-Type: application/json, including DELETE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server/configuration failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/guests/bulk-delete": {
+      "post": {
+        "operationId": "postAdminGuestsBulkDelete",
+        "summary": "Delete up to 50 people and release their food slots atomically",
+        "tags": [
+          "Management"
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Admin-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          }
+        ],
+        "description": "Admin-only permanent deletion. JSON confirmation=\"delete\" is required for every person, including pending/inactive records. Deletes the guest (including their companion) and their canonical FoodContributions document, releases all food claims owned by the guest, and redacts matching public-registration receipts in one transaction. The food catalogue, active flags and permanent hasContributions unit locks are preserved. Old invitation links/replies return 404. Identical original registration retries return 410 REGISTRATION_DELETED and cannot recreate the person or reveal their old receipt. Only the fingerprint and deletedAt remain in a server-only retry tombstone. Missing IDs are safe to retry and orphan contributions/claims are cleaned too. Unrelated guests and anonymous gallery photos are unaffected; no notifications are sent. Operations exceeding an application limit of 450 writes return DELETE_TOO_LARGE without changes. No new indexes or migration are required. Accepts 1–50 unique guest codes. The UI sends groups of 10 to keep cleanup bounded for guests holding many food items. Earlier successful UI batches remain committed if a later one fails; retry continues with remaining IDs.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuestBulkDeleteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestDeleteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid fields or confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Admin sign-in required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origin rejected or X-Admin-Request header missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "GUEST_DELETE_CONFIRMATION_REQUIRED or DELETE_TOO_LARGE; no changes occur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 32 KB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use Content-Type: application/json, including DELETE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server/configuration failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7853,7 +8487,7 @@
           "plusOne",
           "plusOneName"
         ],
-        "description": "Original successful registration receipt. Replays return this receipt without reapplying changes or overwriting later RSVP/admin edits. Use GET /token/{token} for current state. Legacy receipts are normalized to plusOne=false and plusOneName=\"\". No-companion retry fingerprints remain compatible with the previous API version."
+        "description": "Original successful registration receipt. Replays return this receipt without reapplying changes or overwriting later RSVP/admin edits. Use GET /token/{token} for current state. Legacy receipts are normalized to plusOne=false and plusOneName=\"\". No-companion retry fingerprints remain compatible with the previous API version. Permanently deleted registrations do not replay: they return 410 REGISTRATION_DELETED."
       },
       "PlusOneInputRules": {
         "type": "object",
@@ -7914,6 +8548,195 @@
               }
             }
           }
+        ]
+      },
+      "FoodDeleteInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "type": "string",
+            "enum": [
+              "delete"
+            ],
+            "description": "Exact lowercase word required to remove any current guest commitment. The admin UI displays a warning and requires typing it."
+          }
+        }
+      },
+      "FoodBulkDeleteInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,80}$"
+            },
+            "minItems": 1,
+            "maxItems": 50,
+            "uniqueItems": true
+          },
+          "confirmation": {
+            "type": "string",
+            "enum": [
+              "delete"
+            ],
+            "description": "Exact lowercase word required to remove any current guest commitment. The admin UI displays a warning and requires typing it."
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "FoodDeleteResult": {
+        "type": "object",
+        "properties": {
+          "deletedIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "affectedGuests": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "removedChoices": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "deletedIds",
+          "missingIds",
+          "affectedGuests",
+          "removedChoices"
+        ]
+      },
+      "FoodImportInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+            "example": "62c72547-8a62-4126-9b0e-10ee3e7a50ec",
+            "description": "Private UUIDv4 per import batch. Reuse with identical normalized items on retries; changed contents after success return 409 REQUEST_CHANGED."
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/FoodInput"
+            }
+          }
+        },
+        "required": [
+          "requestId",
+          "items"
+        ]
+      },
+      "FoodImportReceipt": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "ids",
+          "count"
+        ]
+      },
+      "GuestDeleteInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "type": "string",
+            "enum": [
+              "delete"
+            ],
+            "description": "Exact lowercase word required for every people deletion. Missing confirmation returns 409 GUEST_DELETE_CONFIRMATION_REQUIRED."
+          }
+        }
+      },
+      "GuestBulkDeleteInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "type": "string",
+            "enum": [
+              "delete"
+            ],
+            "description": "Exact lowercase word required for every people deletion. Missing confirmation returns 409 GUEST_DELETE_CONFIRMATION_REQUIRED."
+          },
+          "ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "GuestDeleteResult": {
+        "type": "object",
+        "properties": {
+          "deletedIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          },
+          "missingIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          },
+          "releasedFoodSlots": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "removedChoices": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "deletedIds",
+          "missingIds",
+          "releasedFoodSlots",
+          "removedChoices"
         ]
       }
     }

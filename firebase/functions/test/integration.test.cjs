@@ -447,56 +447,27 @@ test("shared login rate limits, logout and default-deny Firestore rules", async 
   assert.equal(write.status, 403);
 });
 
-test("seeding is repeatable and preserves member codes, edits and food claims", async () => {
+test("food-only seeding is repeatable, preserves edits and claims, and never writes other collections", async () => {
   const { seedDatabase } = require("../../scripts/seed.cjs");
-  const { memberNames, foodSlots } = require("../../scripts/seed-data.cjs");
-  assert.deepEqual(await seedDatabase(db), {
-    Churches: 1,
-    InvitedGuests: 200,
-    FoodItems: 150,
-  });
-  const stateRef = db.collection("SeedData").doc("gala-2026-members");
-  const tokens = (await stateRef.get()).data().memberTokens;
-  assert.equal(tokens.length, 200);
-  assert.equal(new Set(tokens).size, 200);
-  assert.ok(tokens.every((token) => /^[a-f0-9]{24}$/.test(token)));
-  const invitation = (
-    await request(app).get(`/v1/token/${tokens[0]}`).expect(200)
-  ).body;
-  assert.equal(invitation.name, memberNames[0]);
-  assert.equal(
-    (
-      await db
-        .collection("FoodItems")
-        .where("name", "==", "Baked chicken")
-        .get()
-    ).size,
-    6,
-  );
-  await request(app)
-    .post(`/v1/token/${tokens[0]}/reply`)
-    .send({
-      rsvp: "yes",
-      items: [{ foodItemId: foodSlots[0].id, quantity: 12 }],
-    })
-    .expect(200);
-  await db
-    .collection("InvitedGuests")
-    .doc(tokens[0])
-    .update({ name: "Member renamed in management" });
-  assert.deepEqual(await seedDatabase(db), {
-    Churches: 0,
-    InvitedGuests: 0,
-    FoodItems: 0,
-  });
-  assert.deepEqual((await stateRef.get()).data().memberTokens, tokens);
-  assert.equal(
-    (await db.collection("InvitedGuests").doc(tokens[0]).get()).data().name,
-    "Member renamed in management",
-  );
-  assert.equal(
-    (await db.collection("FoodItems").doc(foodSlots[0].id).get()).data()
-      .claimedBy,
-    tokens[0],
-  );
+  const { foodSlots } = require("../../scripts/seed-data.cjs");
+  async function otherRecords() {
+    const result = {};
+    for (const name of ["Churches", "InvitedGuests", "FoodContributions", "SeedData"])
+      result[name] = (await db.collection(name).get()).docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    return result;
+  }
+  const before = await otherRecords();
+  const initial = await Promise.all([seedDatabase(db), seedDatabase(db)]);
+  assert.deepEqual(initial.map((result) => result.FoodItems).sort((a, b) => a - b), [0, 87]);
+  assert.deepEqual(await otherRecords(), before);
+  const foodRef = db.collection("FoodItems").doc(foodSlots[0].id);
+  await foodRef.update({ name: "Edited food name", active: false, hasContributions: true, claimedBy: guest.token });
+  const saved = (await foodRef.get()).data();
+  assert.deepEqual(await seedDatabase(db), { FoodItems: 0 });
+  assert.deepEqual((await foodRef.get()).data(), saved);
+  assert.deepEqual(await otherRecords(), before);
+  const seeds = await db.collection("FoodItems").where("name", "==", "Water").get();
+  assert.equal(seeds.size, 5);
+  assert.ok(seeds.docs.every((doc) => doc.data().unit === "cases"));
+  assert.equal((await db.collection("SeedData").doc("gala-2026-members").get()).exists, false);
 });

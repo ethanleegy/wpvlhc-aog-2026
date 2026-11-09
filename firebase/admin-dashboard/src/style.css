@@ -209,6 +209,14 @@ small {
 .danger {
   color: #993e32;
 }
+.destructive { background: #a13328; border-color: #a13328; }
+.destructive:hover { background: #85261e; }
+.delete-warning { padding: 20px; border: 2px solid #b33b2d; border-radius: 6px; background: #fff0e9; color: #85261e; }
+.delete-warning h3 { font-size: 1.15rem; }
+.delete-items { max-height: 180px; overflow: auto; padding-left: 22px; font-size: 0.85rem; }
+.food-bulk-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; }
+.food-bulk-actions .check { margin: 0; }
+input.row-checkbox { width: 18px; min-height: 18px; accent-color: #244638; }
 .toolbar {
   display: flex;
   justify-content: space-between;
@@ -219,6 +227,16 @@ small {
 .toolbar label {
   min-width: min(320px, 100%);
   margin: 0;
+}
+.church-context {
+  margin: 0;
+  color: #5f6f60;
+  font-size: 0.8rem;
+}
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .export-actions {
   display: flex;
@@ -290,6 +308,7 @@ input[readonly] {
 }
 .section-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 15px;
@@ -324,6 +343,22 @@ th {
   padding: 14px 12px;
   background: #f5f5ed;
   border-bottom: 1px solid #e1e4d9;
+}
+.row-number {
+  width: 1%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+tbody .row-number {
+  background: transparent;
+  color: #7e8379;
+  border-bottom: 1px solid #eceee5;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+tbody tr:last-child .row-number {
+  border-bottom: 0;
 }
 td {
   border-bottom: 1px solid #eceee5;
@@ -451,6 +486,30 @@ td strong {
 .login-card button {
   width: 100%;
   margin-top: 16px;
+}
+.login-card label[for="admin-password"] {
+  margin-bottom: 6px;
+}
+.password-field {
+  position: relative;
+}
+.password-field input {
+  padding-right: 52px;
+}
+.login-card .password-toggle {
+  position: absolute;
+  inset: 1px 1px 1px auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  color: #365b48;
+}
+.login-card .password-toggle:hover {
+  background: #e9eee6;
 }
 .login-error {
   position: fixed;

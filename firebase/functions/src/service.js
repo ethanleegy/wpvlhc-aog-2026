@@ -45,6 +45,84 @@ function createService(db, config) {
   const foods = db.collection("FoodItems");
   const contributions = db.collection("FoodContributions");
   const registrationRequests = db.collection("PublicRegistrationRequests");
+  const foodImportRequests = db.collection("FoodImportRequests");
+
+  async function importFoods(payload) {
+    const fingerprint = createHash("sha256").update(JSON.stringify(payload.items.map(({ name, unit, description, active }) => ({ name, unit, description, active })))).digest("hex");
+    const key = createHash("sha256").update(`gala-2026:food-import:${payload.requestId.toLowerCase()}`).digest("hex");
+    const receiptRef = foodImportRequests.doc(key);
+    const refs = payload.items.map(() => foods.doc());
+    return db.runTransaction(async (tx) => {
+      const prior = await tx.get(receiptRef);
+      if (prior.exists) {
+        if (prior.data().fingerprint !== fingerprint) throw new ApiError(409, "REQUEST_CHANGED", "This import request already contains different food items.");
+        return { created: false, receipt: prior.data().receipt };
+      }
+      const now = FieldValue.serverTimestamp();
+      payload.items.forEach((item, index) => tx.create(refs[index], { ...item, hasContributions: false, claimedBy: null, createdAt: now, updatedAt: now }));
+      const receipt = { ids: refs.map((ref) => ref.id), count: refs.length };
+      tx.create(receiptRef, { fingerprint, receipt, createdAt: now });
+      return { created: true, receipt };
+    });
+  }
+
+  async function deleteFoods(ids, confirmation) {
+    return db.runTransaction(async (tx) => {
+      const selected = new Set(ids);
+      const [foodDocs, contributionDocs] = await Promise.all([
+        tx.getAll(...ids.map((id) => foods.doc(id))), tx.get(contributions),
+      ]);
+      const affected = contributionDocs.docs.filter((doc) => doc.data().items?.some((item) => selected.has(item.foodItemId)));
+      if ((affected.length || foodDocs.some((doc) => doc.data()?.claimedBy)) && confirmation !== "delete")
+        throw new ApiError(409, "FOOD_DELETE_CONFIRMATION_REQUIRED", "Selected food items have guest commitments. Type delete to remove the items and their food choices.");
+      if (affected.length > 200) throw new ApiError(409, "DELETE_TOO_LARGE", "This deletion affects too many contribution records. Delete fewer food items at a time.");
+      const guestRefs = [...new Set(affected.map((doc) => doc.data().guestId))].map((id) => guests.doc(id));
+      const guestDocs = guestRefs.length ? await tx.getAll(...guestRefs) : [];
+      const now = FieldValue.serverTimestamp();
+      let removedChoices = 0;
+      for (const doc of affected) {
+        const previous = doc.data().items;
+        const items = previous.filter((item) => !selected.has(item.foodItemId));
+        removedChoices += previous.length - items.length;
+        tx.update(doc.ref, { items, updatedAt: now });
+      }
+      for (const doc of guestDocs) if (doc.exists) tx.update(doc.ref, { updatedAt: now });
+      for (const doc of foodDocs) if (doc.exists) tx.delete(doc.ref);
+      return { deletedIds: foodDocs.filter((doc) => doc.exists).map((doc) => doc.id), missingIds: foodDocs.filter((doc) => !doc.exists).map((doc) => doc.id), affectedGuests: affected.length, removedChoices };
+    });
+  }
+
+  async function deleteGuests(ids, confirmation) {
+    if (confirmation !== "delete") throw new ApiError(409, "GUEST_DELETE_CONFIRMATION_REQUIRED", "Type delete to permanently remove these people, their plus-ones and contributions.");
+    return db.runTransaction(async (tx) => {
+      const groups = [];
+      for (let index = 0; index < ids.length; index += 10) groups.push(ids.slice(index, index + 10));
+      const [guestDocs, contributionDocs, foodSnapshots, requestSnapshots] = await Promise.all([
+        tx.getAll(...ids.map((id) => guests.doc(id))),
+        tx.getAll(...ids.map((id) => contributions.doc(id))),
+        Promise.all(groups.map((group) => tx.get(foods.where("claimedBy", "in", group)))),
+        Promise.all(groups.map((group) => tx.get(registrationRequests.where("registration.token", "in", group)))),
+      ]);
+      const claimedFoods = foodSnapshots.flatMap((snapshot) => snapshot.docs);
+      const receipts = requestSnapshots.flatMap((snapshot) => snapshot.docs);
+      const existingGuests = guestDocs.filter((doc) => doc.exists);
+      const existingContributions = contributionDocs.filter((doc) => doc.exists);
+      if (existingGuests.length + existingContributions.length + claimedFoods.length + receipts.length > 450)
+        throw new ApiError(409, "DELETE_TOO_LARGE", "This deletion affects too many food choices. Select fewer people at a time.");
+      const now = FieldValue.serverTimestamp();
+      for (const doc of claimedFoods) tx.update(doc.ref, { claimedBy: null, updatedAt: now });
+      for (const doc of existingContributions) tx.delete(doc.ref);
+      for (const doc of existingGuests) tx.delete(doc.ref);
+      // Keep only a retry tombstone: erase the name, companion, choices and token.
+      for (const doc of receipts) tx.set(doc.ref, { fingerprint: doc.data().fingerprint, deletedAt: now });
+      return {
+        deletedIds: existingGuests.map((doc) => doc.id),
+        missingIds: guestDocs.filter((doc) => !doc.exists).map((doc) => doc.id),
+        releasedFoodSlots: claimedFoods.length,
+        removedChoices: existingContributions.reduce((total, doc) => total + (doc.data().items?.length || 0), 0),
+      };
+    });
+  }
 
   async function prepareFoodSelection(tx, token, selected, previous = []) {
     const selectedIds = new Set(selected.map((item) => item.foodItemId));
@@ -164,6 +242,7 @@ function createService(db, config) {
       if (prior.exists) {
         if (prior.data().fingerprint !== fingerprint)
           throw new ApiError(409, "REQUEST_CHANGED", "This request ID already belongs to a different registration. Use the guest code to update the saved response.");
+        if (prior.data().deletedAt) throw new ApiError(410, "REGISTRATION_DELETED", "This registration was deleted by management. A new registration requires a new request ID.");
         // Return the original receipt without overwriting subsequent RSVP/admin edits.
         const receipt = prior.data().registration;
         return { created: false, registration: { ...receipt, ...plusOneDetails(receipt) } };
@@ -348,6 +427,9 @@ function createService(db, config) {
     listFoods: (publicOnly = false) => list(foods, publicOnly),
     createFood: (data) => create(foods, data),
     patchFood: (id, data) => patch(foods, id, data),
+    importFoods,
+    deleteFoods,
+    deleteGuests,
   };
 }
 

@@ -17,6 +17,7 @@ export async function api(
       data.error?.message || "The request could not be completed.",
     );
     error.status = response.status;
+    error.code = data.error?.code;
     if (response.status === 401 && path !== "/login")
       window.dispatchEvent(new Event("session-expired"));
     throw error;
@@ -24,12 +25,12 @@ export async function api(
   if (download) return response.blob();
   return response.status === 204 ? null : response.json();
 }
-export async function allGuests() {
+export async function allGuests(churchId) {
   const guests = [];
   let cursor = null;
   do {
     const page = await api(
-      `/guests?limit=100${cursor ? `&after=${encodeURIComponent(cursor)}` : ""}`,
+      `/guests?limit=100${churchId ? `&churchId=${encodeURIComponent(churchId)}` : ""}${cursor ? `&after=${encodeURIComponent(cursor)}` : ""}`,
     );
     guests.push(...page.guests);
     cursor = page.nextCursor;
@@ -41,10 +42,23 @@ export async function downloadReport(kind, churchId) {
     `/reports/${kind}.csv${churchId ? `?churchId=${encodeURIComponent(churchId)}` : ""}`,
     { download: true },
   );
+  saveDownload(blob, `gala-${kind}.csv`);
+}
+
+function csvCell(value) {
+  let text = String(value ?? "");
+  if (/^[\s\uFEFF]*[=+@-]/u.test(text) || /^[\t\r\n]/u.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+export function downloadCsv(filename, headers, rows) {
+  const csv = "\uFEFF" + [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
+  saveDownload(new Blob([csv], { type: "text/csv;charset=utf-8" }), filename);
+}
+function saveDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `gala-${kind}.csv`;
+  link.download = filename;
   document.body.append(link);
   link.click();
   link.remove();

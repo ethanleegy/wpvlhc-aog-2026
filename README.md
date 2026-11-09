@@ -37,6 +37,8 @@ Start with [APISPECS](api-spec/APISPECS.md) and import [openapi.json](api-spec/o
 
 ## Run locally
 
+The React management UI defaults to World Prayer Vision Life Healing Center. It provides registration/plus-one headcounts, numbered lists and separate people, food-catalogue and contribution CSV exports. The existing API retains its church support; see the [dashboard guide](firebase/admin-dashboard/README.md) for the UI scope and count definitions.
+
 Use Node.js 24 and Java 21+ for the Firestore emulator.
 
 ```sh
@@ -46,7 +48,7 @@ npm ci --prefix firebase/functions
 npm ci --prefix firebase/admin-dashboard
 ```
 
-Follow [Firebase setup](firebase/README.md) for local secrets, emulators and initial church/menu seeding. Then:
+Follow [Firebase setup](firebase/README.md) for local secrets, emulators, the required event church and food-only catalogue seeding. Then:
 
 ```sh
 npm run admin:dev

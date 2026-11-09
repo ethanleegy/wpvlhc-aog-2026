@@ -34,7 +34,7 @@ function createApp({ getDb, getConfig, logger = console, galleryStorageFactory }
       res.locals.config = getConfig();
       cors({
         credentials: true,
-        methods: ["GET", "POST", "PATCH", "OPTIONS"],
+        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "X-Admin-Request"],
         origin(origin, callback) {
           if (!origin || res.locals.config.origins.includes(origin))
@@ -56,7 +56,7 @@ function createApp({ getDb, getConfig, logger = console, galleryStorageFactory }
   app.use(express.json({ limit: "32kb", strict: true }));
   app.use(cookieParser());
   app.use((req, res, next) => {
-    if (["POST", "PATCH"].includes(req.method) && !req.is("application/json"))
+    if (["POST", "PATCH", "DELETE"].includes(req.method) && !req.is("application/json"))
       return next(
         new ApiError(
           415,
@@ -126,7 +126,7 @@ function createApp({ getDb, getConfig, logger = console, galleryStorageFactory }
   const admin = express.Router();
   admin.use((req, res, next) => {
     if (
-      ["POST", "PATCH"].includes(req.method) &&
+      ["POST", "PATCH", "DELETE"].includes(req.method) &&
       req.get("X-Admin-Request") !== "true"
     ) {
       return next(
@@ -182,6 +182,16 @@ function createApp({ getDb, getConfig, logger = console, galleryStorageFactory }
   admin.post("/food-items", input(schemas.foodCreate), async (req, res) =>
     res.status(201).json(await res.locals.service.createFood(res.locals.body)),
   );
+  admin.post("/food-items/import", input(schemas.foodImport), async (req, res) => {
+    const result = await res.locals.service.importFoods(res.locals.body);
+    res.status(result.created ? 201 : 200).json(result.receipt);
+  });
+  admin.post("/food-items/bulk-delete", input(schemas.foodBulkDelete), async (req, res) =>
+    res.json(await res.locals.service.deleteFoods(res.locals.body.ids, res.locals.body.confirmation)),
+  );
+  admin.delete("/food-items/:id", input(schemas.id, "params"), input(schemas.foodDelete), async (req, res) =>
+    res.json(await res.locals.service.deleteFoods([res.locals.params.id], res.locals.body.confirmation)),
+  );
   admin.patch(
     "/food-items/:id",
     input(schemas.id, "params"),
@@ -199,6 +209,12 @@ function createApp({ getDb, getConfig, logger = console, galleryStorageFactory }
   );
   admin.post("/guests", input(schemas.guestCreate), async (req, res) =>
     res.status(201).json(await res.locals.service.createGuest(res.locals.body)),
+  );
+  admin.post("/guests/bulk-delete", input(schemas.guestBulkDelete), async (req, res) =>
+    res.json(await res.locals.service.deleteGuests(res.locals.body.ids, res.locals.body.confirmation)),
+  );
+  admin.delete("/guests/:id", input(schemas.guestId, "params"), input(schemas.guestDelete), async (req, res) =>
+    res.json(await res.locals.service.deleteGuests([res.locals.params.id], res.locals.body.confirmation)),
   );
   admin.get("/guests/:id", input(schemas.guestId, "params"), async (req, res) =>
     res.json(await res.locals.service.getGuest(res.locals.params.id)),

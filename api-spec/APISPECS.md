@@ -15,7 +15,7 @@ Use the absolute deployed API URL on the public Jekyll site. The public invitati
 
 ## Shared-link public registration
 
-Added alongside the personal invitation flow: `POST /registrations`. This backend endpoint is available after deploying the API update. The frontend developer owns the user flow; no public or management UI files are changed by this addition.
+Added alongside the personal invitation flow: `POST /registrations`. This backend endpoint is available after deploying the API update. The frontend developer owns the public registration flow; React management displays the resulting guest records.
 
 The endpoint registers **one named primary attendee, optionally with one named companion**. The server assigns `churchId:"wpvlhc-aog"`, `rsvp:"yes"`, `active:true` and `registrationSource:"public"`. The `wpvlhc-aog` church must already exist and be active. A shared-link visitor choosing not to attend creates no guest record and does not call this endpoint. Existing personal-code decline/update endpoints remain available.
 
@@ -66,6 +66,7 @@ Guest creation, food reservation, contribution and receipt commit atomically. A 
 | `404 NOT_FOUND` | A selected food record does not exist; refresh the catalogue. |
 | `409 FOOD_ITEM_TAKEN` / `FOOD_ITEM_INACTIVE` | Refresh available choices and preserve unsaved input. |
 | `409 REQUEST_CHANGED` | The ID already has a successful receipt; use that guest's code for edits. |
+| `410 REGISTRATION_DELETED` | Management deleted the person. Discard the old receipt/code; create a new request ID only for a deliberate new registration. |
 | `429 RATE_LIMITED` | Honor `Retry-After: 900`; limit is 500 validated attempts per observed IP per 15 minutes, including retries. |
 | `503 REGISTRATION_UNAVAILABLE` | The server-assigned church is missing or inactive; operator action is needed. |
 
@@ -73,7 +74,7 @@ Registrations appear in the existing management list, attendance/food reports an
 
 ## Named plus-one contract
 
-This is an additive backend change in API version 1.3.0. Deploy the API before sending these fields. The frontend developer handles the prompts: attendee's own name, whether they are bringing a plus-one, then the companion's name when Yes is selected. No UI files are changed by this backend update.
+This is an additive backend change in API version 1.3.0. Deploy the API before sending these fields. The public frontend developer handles the prompts: attendee's own name, whether they are bringing a plus-one, then the companion's name when Yes is selected. React management also supports companion corrections through its reply editor.
 
 The same companion fields are supported by `POST /registrations`, `POST /token/{token}/reply`, `POST /admin/guests`, `PATCH /admin/guests/{id}` and `POST /admin/guests/{id}/reply`:
 
@@ -93,7 +94,7 @@ The companion stays on the primary guest record: no second token, invitation, in
 
 Companion details participate in registration retry matching. After success, changing the flag or companion name with the same `requestId` returns `409 REQUEST_CHANGED`; use the returned guest code for later edits. Omitting companion fields and explicitly sending `false`/`""` are equivalent, including for receipts created before this release. Old receipts return the added fields as `false`/`""`; replay never overwrites later companion changes.
 
-Overall and per-church reports add `plusOnes` (companions of active Yes replies) and `attendingPeople` (`yes + plusOnes`). For example, 10 confirmed primary guests with four companions means `yes:10`, `plusOnes:4`, `attendingPeople:14`. Existing invitation/RSVP/contributor counts keep their meanings. Guest CSVs append `Plus one` and `Plus-one name` columns, retaining one row per primary guest. The admin frontend must explicitly display the new fields/headcount; its existing Yes tile still counts primary registrations.
+Overall and per-church reports add `plusOnes` (companions of active Yes replies) and `attendingPeople` (`yes + plusOnes`). For example, 10 confirmed primary guests with four companions means `yes:10`, `plusOnes:4`, `attendingPeople:14`. Existing invitation/RSVP/contributor counts keep their meanings. Guest CSVs append `Plus one` and `Plus-one name` columns, retaining one row per primary guest. The React dashboard displays companion names and uses `attendingPeople` for its People coming card; existing API `yes` counts still mean primary registrations.
 
 ## Personal invitation flow
 
@@ -234,11 +235,16 @@ The React app already consumes these endpoints. All paths below are prefixed wit
 | GET | `/food-items` | `{foodItems:[...]}` including inactive |
 | POST | `/food-items` | `{name,unit,description?,active?}` → 201 food item |
 | PATCH | `/food-items/{id}` | Nonempty subset of `name,unit,description,active` → item |
+| DELETE | `/food-items/{id}` | JSON `{confirmation?:"delete"}` → deleted/missing IDs and removed choice counts |
+| POST | `/food-items/bulk-delete` | `{ids,confirmation?:"delete"}`; 1–50 unique IDs, atomic deletion/choice cleanup |
+| POST | `/food-items/import` | `{requestId,items}`; 1–10 food-create payloads, 201 new / 200 identical retry |
 | GET | `/guests` | `{guests:[...],nextCursor}`; query: `churchId,rsvp,limit,after` |
 | POST | `/guests` | `{name,churchId,personalizedName?,active?,plusOne?,plusOneName?}` → 201 person, generated `token,uniqueUrl` |
 | GET | `/guests/{id}` | Person and saved `items`, including inactive invitations |
 | PATCH | `/guests/{id}` | Nonempty subset of `name,churchId,personalizedName,active,plusOne,plusOneName`; companion pairing rules apply |
 | POST | `/guests/{id}/reply` | Same reply payload as public API; correct response on behalf of person |
+| DELETE | `/guests/{id}` | `{"confirmation":"delete"}` → permanent deletion, contribution cleanup and released food-slot count |
+| POST | `/guests/bulk-delete` | `{ids,confirmation:"delete"}`; 1–50 unique guest codes, atomic cleanup |
 | GET | `/reports/summary` | Overall/per-church RSVP counts, `plusOnes`, `attendingPeople`, per-item quantities and detailed contributions |
 | GET | `/reports/guests.csv` | Guest CSV, including private invitation links and companion fields |
 | GET | `/reports/food.csv` | Food commitments by person, church, item, quantity/unit and notes |
@@ -257,11 +263,33 @@ await fetch("/v1/admin/login", {
 
 Guest pagination defaults to 50, maximum 100. Results include active/inactive guests ordered by document ID. Pass returned `nextCursor` as `after`, retaining the same `churchId`/`rsvp` filters, until null. `rsvp` filters accept `yes`, `no` or `pending`. No total count is implied by a single page; use summary reports for active guest counts.
 
-IDs and URLs are server-generated and immutable. New/reassigned guests require an active church. Set `active:false` to deactivate; deletion endpoints are intentionally absent. Inactive guest links return 410; reports exclude them until reactivated. Inactive church/food records keep history. Once a food item has received any contribution, changing its unit returns 409; create a new item for a different unit.
+IDs and URLs are server-generated and immutable. New/reassigned guests require an active church. Set `active:false` to deactivate reversibly; church deletion remains unavailable. Inactive guest links return 410; reports exclude them until reactivated. Inactive church/food records keep history. People and food items can also be permanently deleted with the confirmation rules below. Once a food item has received any contribution, changing its unit returns 409; create a new item for a different unit.
 
 Deactivating a guest retains their food reservations. To also free those slots, record a declined reply or an empty food selection through the admin reply endpoint. The admin food list includes `claimedBy` (the owning guest code, or null); public food responses never expose it.
 
 Reports accept optional `?churchId=<id>` and reflect a consistent snapshot of active invitations. `yes`, `no` and `pending` add up to `invited`; these count primary guest records. `plusOnes` counts confirmed companions and `attendingPeople` is `yes + plusOnes`. `contributors` counts attending primary guests with at least one food item. Food totals are per item/unit, never summed across unrelated units or multiplied by companions. `contributions` lists each primary person/item once. Church reassignment moves both people's attendance and the primary person's commitments automatically. CSVs contain a UTF-8 BOM/CRLF, escaped cells and formula neutralization. Guest CSV columns are `Name, Church, RSVP, Invitation URL, Responded at, Plus one, Plus-one name`.
+
+## Food import and permanent deletion
+
+API version 1.4.0 adds three authenticated admin operations; existing public/RSVP/gallery routes are retained. Deploy `functions:api` and Hosting together for the updated admin UI. DELETE also requires JSON, `X-Admin-Request:true`, the admin session and an allowed origin.
+
+- `DELETE /admin/food-items/{id}` accepts `{}` for an unused item, or `{"confirmation":"delete"}`. `POST /admin/food-items/bulk-delete` accepts `{"ids":["food-a","food-b"],"confirmation":"delete"}` with 1–50 unique IDs.
+- Without the exact lowercase confirmation word, any current claim or contribution reference returns `409 FOOD_DELETE_CONFIRMATION_REQUIRED` and the entire batch stays unchanged. The UI displays a prominent warning and requires typing the word. A newly selected item is checked server-side even if the UI loaded before that selection.
+- Deletion atomically removes catalogue records and every matching choice from contributions, including inactive/legacy records. Guest attendance/plus-ones and other choices stay unchanged. Guest `updatedAt` changes, `respondedAt` does not. Historical original registration/import receipts are retained and never reapply deleted choices. Guests are not notified automatically.
+- Success returns `{deletedIds,missingIds,affectedGuests,removedChoices}`. Missing IDs are treated as already absent; retries do not duplicate effects. The transaction reads the event contribution collection to clean legacy references; at most 200 affected contribution records per batch are allowed (`409 DELETE_TOO_LARGE` beyond that). Larger UI selections run in groups of 50, so earlier successful groups remain committed if a later one fails. Refresh the guest's current state/menu after a deleted-food 404 when editing an older RSVP.
+- `POST /admin/food-items/import` accepts JSON `{"requestId":"<UUIDv4>","items":[{"name":"Rice","unit":"servings","description":"","active":true}]}`. It creates 1–10 new unclaimed slots atomically and returns `{ids,count}` with 201. Duplicate names are intentional separate slots. Only food-create fields are allowed; clients cannot import IDs, claims or unit-lock flags.
+- Reuse each private UUIDv4 with the identical normalized ordered rows on retries: 200 returns the original receipt; changed contents after success return `409 REQUEST_CHANGED`. Defaults for description/active and object-field order are normalized; row order matters. A new request ID intentionally adds more slots. Retry after later deletion returns the original IDs without recreating them.
+- CSV parsing is device-side. The React import validates all rows, previews them, then sends groups of 10 with saved IDs/progress for reload recovery. CSV columns, limits and examples are in the [dashboard guide](../firebase/admin-dashboard/README.md#add-food-items-from-csv). No raw file upload endpoint, new secrets, indexes or data migration are needed. `FoodImportRequests` receipts are server-only.
+
+## Permanent people deletion
+
+API version 1.5.0 adds authenticated `DELETE /admin/guests/{id}` and `POST /admin/guests/bulk-delete`. Both require JSON, `X-Admin-Request:true`, an admin session and the exact `confirmation:"delete"` word. Missing confirmation returns `409 GUEST_DELETE_CONFIRMATION_REQUIRED`; wrong-case/unknown fields/invalid IDs return 400. Bulk input requires 1–50 distinct 24-character lowercase hexadecimal guest codes.
+
+The transaction deletes each guest record (including its companion details) and its contribution document, releases every food slot whose `claimedBy` is that guest, and redacts the matching original public registration receipt. Reports, attendance, headcount, contributors and exports reflect the remaining records. Catalogue entries, active/inactive flags and permanent unit locks are preserved. Other people's records/claims and anonymous gallery photos are unchanged. Guests are not automatically notified.
+
+Success returns `{deletedIds,missingIds,releasedFoodSlots,removedChoices}`. Missing IDs are safe to retry; any orphan contribution/claim is cleaned up too. Old invitation URLs and replies return 404. The private registration retry record retains only `fingerprint` and `deletedAt`, removing the stored receipt/name/companion/choices/token. An identical registration retry after deletion returns `410 REGISTRATION_DELETED` without restoring the person or returning the old receipt. A new request ID can create a genuinely new registration if the visitor deliberately starts again.
+
+Each API batch is atomic. More than 450 writes returns `409 DELETE_TOO_LARGE` without changes; the UI uses groups of 10 to keep ordinary guest food cleanup bounded, preserves progress while its dialog remains open, and permits retry of remaining IDs after interruptions. Prior successful groups stay deleted. People-table selection applies only to the currently shown search/reply-filtered records and resets when the view changes. Every UI deletion shows a prominent warning and requires typing **delete**, including guests without contributions. Deploy `functions:api` and Hosting together; no schema migration, new index or secret is required.
 
 ## Errors and limits
 

@@ -5,24 +5,27 @@ const { schemas, validate } = require("../src/validation");
 const { inviteUrl, buildReport } = require("../src/service");
 const { csvCell, guestCsv } = require("../src/csv");
 const { loadConfig } = require("../src/config");
-const { memberNames, foodSlots } = require("../../scripts/seed-data.cjs");
+const { menu, foodSlots } = require("../../scripts/seed-data.cjs");
 
-test("seed contains 200 sample members and 150 separate Guyanese menu slots", () => {
-  assert.equal(memberNames.length, 200);
-  assert.equal(new Set(memberNames).size, 200);
-  assert.equal(foodSlots.length, 150);
-  assert.equal(new Set(foodSlots.map((food) => food.id)).size, 150);
+test("client menu has 42 dishes and 87 uniquely identified food-only slots", () => {
+  assert.equal(menu.length, 42);
+  assert.equal(foodSlots.length, 87);
+  assert.equal(new Set(foodSlots.map((food) => food.id)).size, 87);
   const counts = new Map();
   for (const food of foodSlots) {
     const { id, ...payload } = food;
+    validate(schemas.id, { id });
     validate(schemas.foodCreate, payload);
+    assert.ok(food.description.length > 20);
     counts.set(food.name, (counts.get(food.name) || 0) + 1);
   }
-  assert.equal(counts.size, 50);
-  assert.ok([...counts.values()].every((count) => count === 3));
-  assert.equal(counts.get("Baked chicken"), 3);
-  for (const name of memberNames)
-    validate(schemas.guestCreate, { name, churchId: "wpvlhc-aog" });
+  assert.equal(counts.size, 42);
+  assert.equal(counts.get("Water"), 5);
+  assert.equal(counts.get("Fried rice"), 2);
+  assert.ok([...counts].every(([name, count]) => count === (name === "Water" ? 5 : 2)));
+  for (const [name, unit] of [["Water", "cases"], ["Fried rice", "gallon"], ["Ham", "trays"], ["Roti", "dozen"], ["Sponge cake", "cakes"], ["Ice cream", "tubs"], ["Sanitary cups", "packs"]])
+    assert.equal(menu.find((item) => item.name === name).unit, unit);
+  assert.equal(counts.has("Baked chicken"), false);
 });
 
 test("replies require explicit quantities, unique known-shaped IDs and consistent attendance", () => {

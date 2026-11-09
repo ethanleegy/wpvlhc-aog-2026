@@ -3,6 +3,7 @@ const { ApiError } = require("./errors");
 
 const id = Joi.string().pattern(/^[A-Za-z0-9_-]{1,80}$/);
 const token = Joi.string().pattern(/^[a-f0-9]{24}$/);
+const requestId = Joi.string().pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
 const text = (max) => Joi.string().trim().max(max);
 const churchFields = { name: text(160), active: Joi.boolean() };
 const foodFields = {
@@ -11,6 +12,13 @@ const foodFields = {
   description: text(500).allow(""),
   active: Joi.boolean(),
 };
+const foodCreate = Joi.object({
+  ...foodFields,
+  name: foodFields.name.required(),
+  unit: foodFields.unit.required(),
+  description: foodFields.description.default(""),
+  active: foodFields.active.default(true),
+});
 const plusOneFields = {
   plusOne: Joi.boolean(),
   plusOneName: Joi.when("plusOne", {
@@ -57,14 +65,13 @@ const schemas = {
     active: churchFields.active.default(true),
   }),
   churchPatch: Joi.object(churchFields).min(1),
-  foodCreate: Joi.object({
-    ...foodFields,
-    name: foodFields.name.required(),
-    unit: foodFields.unit.required(),
-    description: foodFields.description.default(""),
-    active: foodFields.active.default(true),
-  }),
+  foodCreate,
   foodPatch: Joi.object(foodFields).min(1),
+  foodImport: Joi.object({ requestId: requestId.required(), items: Joi.array().items(foodCreate).min(1).max(10).required() }),
+  foodDelete: Joi.object({ confirmation: Joi.string().valid("delete") }),
+  foodBulkDelete: Joi.object({ ids: Joi.array().items(id.required()).unique().min(1).max(50).required(), confirmation: Joi.string().valid("delete") }),
+  guestDelete: Joi.object({ confirmation: Joi.string().valid("delete") }),
+  guestBulkDelete: Joi.object({ ids: Joi.array().items(token.required()).unique().min(1).max(50).required(), confirmation: Joi.string().valid("delete") }),
   guestCreate: Joi.object({
     ...guestFields,
     name: guestFields.name.required(),
@@ -74,9 +81,7 @@ const schemas = {
   }).custom(checkPlusOne),
   guestPatch: Joi.object(guestFields).min(1).custom(checkPlusOne),
   registration: Joi.object({
-    requestId: Joi.string()
-      .pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
-      .required(),
+    requestId: requestId.required(),
     name: guestFields.name.required(),
     ...plusOneFields,
     items: replyItems,

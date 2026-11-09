@@ -46,16 +46,33 @@ The `demo-wpvlhc` project is deliberately used locally. It cannot reach a live F
 | React development server | `http://127.0.0.1:5173` |
 | Public Jekyll site | `http://localhost:3000` |
 
-In a second terminal, seed the church, 200 sample members and 150 Guyanese food/drink slots:
+In a second terminal, seed the current food catalogue only:
 
 ```sh
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm --prefix firebase run seed
 npm run admin:dev
 ```
 
-Sign in with `ADMIN_USERNAME` from `.env.local` (example: `churchadmin`) and the password you hashed. The sample members have random personal invitation codes and pending RSVPs; rename them to real members before distributing links. Names and menu definitions are in `scripts/seed-data.cjs`. The menu has 50 dishes/drinks, each listed three times with separate IDs (`gala-food-001` through `gala-food-150`). For example, three Baked chicken records allow three people to reserve one slot each. Quantities still specify how many servings, pieces, slices or bottles that person will bring.
+Sign in with `ADMIN_USERNAME` from `.env.local` (example: `churchadmin`) and the password you hashed. The seed writes **only `FoodItems`**: no church records, sample people, invitation codes, contributions or `SeedData` state are created. The existing active `Churches/wpvlhc-aog` record is still required for public registration and the admin report; restore it separately if the entire database was cleared.
 
-Preview without credentials or database writes: `npm --prefix firebase run seed -- --dry-run`. Rerunning the actual seed preserves existing names, codes, replies and food commitments; it only creates missing seed records. Previously created records, including the old 12-item menu, are left intact and can be deactivated in management. The private `SeedData/gala-2026-members` document retains generated member codes so retries never duplicate the 200 sample invitations.
+The client menu is in `scripts/seed-data.cjs`: **42 menu items and 87 independent contribution slots**. Every item has two slots except Water, which has five. Sponge cake and Ice cream are separate items; the pasted duplicate Cheese straw entry is included once as Cheese straws. Spelling has been cleaned up. Units are trays for meats/baked dishes/vegetable sides, gallon for rice/salads/soups/homemade drinks, dozen for pastries/eggs/roti/puri, cakes/tubs for dessert, packs for sweets/nuts/disposable supplies, and cases for packaged drinks/water. Each description explains one unit; the guest's quantity multiplies that unit.
+
+Preview the complete quantities, units and descriptions without credentials or database access:
+
+```sh
+npm --prefix firebase run seed -- --dry-run
+```
+
+The seed uses stable per-item/slot IDs such as `gala-food-water-01` through `gala-food-water-05`. A transaction creates missing slots and preserves existing edits, claims, unit locks and timestamps. Repeating or retrying the command does not create duplicates. It does not clear an existing menu; remove old food records through the admin deletion controls before replacing a live catalogue. Only missing seed records are added, so changing the seed file does not overwrite an already seeded item.
+
+For the cleared production food catalogue, with Application Default Credentials already configured:
+
+```sh
+unset FIRESTORE_EMULATOR_HOST
+npm --prefix firebase run seed -- --production --project wpvlhc-aog-2026
+```
+
+If authentication is needed, run `gcloud auth application-default login` first. Production mode requires an explicit real project and rejects an active emulator setting. Local mode requires both a demo project and an emulator. No app deployment is needed to seed data.
 
 Emulator data is temporary unless you use Firebase CLI `--export-on-exit` / `--import`. Keep data exports outside the public Jekyll output and source control.
 
@@ -76,13 +93,14 @@ Credentials, PUBLIC_SITE_URL and ALLOWED_ORIGINS are required. In production, `P
 
 | Collection | Document ID | Contents |
 | --- | --- | --- |
-| `Churches` | Server ID; seed: `wpvlhc-aog` | `name`, `active`, `createdAt`, `updatedAt` |
+| `Churches` | Server ID; required event record: `wpvlhc-aog` | `name`, `active`, `createdAt`, `updatedAt` |
 | `InvitedGuests` | Server-generated 24-character lowercase hexadecimal invitation code | `name`, `personalizedName`, `churchId`, `active`, `rsvp` (`pending`, `yes`, `no`), `plusOne`, `plusOneName`, optional `registrationSource:"public"`, `respondedAt`, `createdAt`, `updatedAt` |
-| `FoodItems` | Server ID; seeds: `gala-food-001` etc. | `name`, `description`, `unit`, `active`, `hasContributions`, `claimedBy` (guest code or null), `createdAt`, `updatedAt` |
+| `FoodItems` | Server ID; current seeds: `gala-food-water-01` etc. | `name`, `description`, `unit`, `active`, `hasContributions`, `claimedBy` (guest code or null), `createdAt`, `updatedAt` |
 | `FoodContributions` | Same code as the person | `guestId`, `items: [{foodItemId, name, unit, quantity, notes}]`, `updatedAt` |
-| `PublicRegistrationRequests` | SHA-256 of event and canonical private UUIDv4 request ID | Input fingerprint, original registration receipt (including guest code), `createdAt`; server-only, retained for idempotent retries |
+| `PublicRegistrationRequests` | SHA-256 of event and canonical private UUIDv4 request ID | Input fingerprint, original registration receipt (including guest code), `createdAt`; after permanent person deletion only `fingerprint` and `deletedAt` remain, preventing old retries from restoring or revealing deleted records |
+| `FoodImportRequests` | SHA-256 of event and private UUIDv4 batch ID | Food-input fingerprint, original imported slot IDs/count, `createdAt`; server-only retry receipts |
 | `RateLimits` | SHA-256 digest of a limit key | `count`, `expiresAt` (TTL field) |
-| `SeedData` | `gala-2026-members` | Private `memberTokens` array for repeatable sample seeding |
+| `SeedData` | Legacy `gala-2026-members` | Historical sample-seed state, if present; the food-only seed does not read or write it |
 
 Timestamps are Firestore server timestamps internally and ISO 8601 UTC strings in JSON. `token` and `uniqueUrl` are derived response fields; clients cannot choose them. Query tokens are bearer credentials for the person's RSVP. Do not log full invitation URLs or send them to analytics. The public layout includes a no-referrer policy.
 
@@ -92,11 +110,11 @@ Companion fields update in the same transaction as the RSVP and food choices. `p
 
 Each food record is a single-person slot. Reserving it atomically removes it from the public menu; another person receives `409 FOOD_ITEM_TAKEN`. Removing it from a reply or declining releases it. Owners can revise their quantities without reserving it twice. Deactivating an invitation retains its recorded commitments; clear its reply if you also want to release the slots.
 
-Use `PATCH {"active":false}` instead of deletion. Inactive guests return 410 publicly and are excluded from reports; reactivation restores their recorded responses/contributions. Inactive churches keep existing invitations and reports but cannot receive new or reassigned guests. Inactive food options disappear from the public catalogue and retain commitments. Management can correct responses on inactive guest records.
+Guests/churches can be deactivated using `PATCH {"active":false}`. People also support permanent single/bulk deletion with mandatory `confirmation:"delete"`, contribution removal and food-slot release; church deletion is unavailable. Food items support explicit single/bulk permanent deletion with choice cleanup; selected items require typing `delete` in the UI and sending that confirmation to the API. Inactive guests return 410 publicly and are excluded from reports; reactivation restores their recorded responses/contributions. Inactive churches keep existing invitations and reports but cannot receive new or reassigned guests. Inactive food options disappear from the public catalogue and retain commitments. Management can correct responses on inactive guest records.
 
 ## Reports and access
 
-Reports read a consistent Firestore snapshot. Existing RSVP counts cover active primary guest records. Overall/per-church `plusOnes` counts companions of active Yes replies; `attendingPeople=yes+plusOnes` is the confirmed headcount. Pending, declined and inactive records add no confirmed companions. Contributor counts and food quantities are unchanged and grouped by the primary person's current church. CSVs use UTF-8 with BOM, quotes and CRLF and neutralize spreadsheet formulas. Guest exports contain private invitation URLs and append `Plus one` and `Plus-one name` columns. The admin UI must adopt the new fields explicitly; its existing Yes count remains primary registrations.
+Reports read a consistent Firestore snapshot. Existing RSVP counts cover active primary guest records. Overall/per-church `plusOnes` counts companions of active Yes replies; `attendingPeople=yes+plusOnes` is the confirmed headcount. Pending, declined and inactive records add no confirmed companions. Contributor counts and food quantities are unchanged and grouped by the primary person's current church. CSVs use UTF-8 with BOM, quotes and CRLF and neutralize spreadsheet formulas. Guest exports contain private invitation URLs and append `Plus one` and `Plus-one name` columns. The React dashboard uses `attendingPeople` for People coming and displays companion names; API `yes` continues to count primary registrations.
 
 Admin sessions use an 8-hour `__session` HttpOnly cookie, SameSite=Strict, Secure in production. Hosting rewrites `/v1/**` to the function, keeping administration same-origin. Every admin mutation, including login/logout, requires JSON and `X-Admin-Request: true`. Logout clears the browser cookie; copied JWTs expire naturally. Rotate `ADMIN_JWT_SECRET` and redeploy to invalidate all sessions.
 
@@ -134,7 +152,7 @@ For the gallery's full Cloudflare + Firebase + public-site sequence, use the [pr
    Enter your chosen admin password in the hash helper, then paste only its complete `$2b$...` output at the `ADMIN_PASSWORD_HASH` prompt. Paste the generated random string at the `ADMIN_JWT_SECRET` prompt; it must contain at least 32 bytes. Use the original chosen password in the login form. Secret changes take effect after redeploying the function. No plaintext password belongs in environment files.
 
 5. From `firebase/`, run `npm run deploy -- --project <project-id>`. It validates the spec, runs backend unit tests, builds the dashboard, then deploys functions, rules/indexes and admin Hosting. Run integration tests separately before deploying.
-6. With Google Application Default Credentials configured, seed missing records explicitly from the repository root:
+6. With Google Application Default Credentials configured and the event church already set up, seed missing food records explicitly from the repository root:
 
    ```sh
    npm --prefix firebase run seed -- --production --project <project-id>
@@ -153,3 +171,11 @@ Official references: [Functions runtime/deployment](https://firebase.google.com/
 ## Dependency audit
 
 At implementation, the backend and React dependency audits report zero vulnerabilities. The separately installed Firebase CLI development tooling reports 15 moderate upstream advisories. Compatible audit fixes have been applied; the remaining CLI findings require upstream updates. The CLI is not a deployed function/dashboard dependency. Recheck with `npm audit --prefix firebase/functions`, `npm audit --prefix firebase/admin-dashboard` and `npm audit --prefix firebase` when updating dependencies.
+
+## Food catalogue bulk operations
+
+Admin API version 1.4.0 supports `DELETE /food-items/{id}`, `POST /food-items/bulk-delete` (up to 50 IDs) and `POST /food-items/import` (up to 10 create payloads with a private UUIDv4 per batch). Deletion scans current contribution records in the transaction, removes matching choices including inactive/legacy references, and preserves RSVP/companion/other choices. Selected choices require `confirmation:"delete"`; missing IDs are safe to retry. Import receipts prevent duplicate slots after uncertain requests and do not recreate slots deleted later. The UI parses/previews up to 2,000 CSV rows locally and saves progress for resuming. See the [admin guide](admin-dashboard/README.md) for CSV columns and warnings and [API handoff](../api-spec/APISPECS.md#food-import-and-permanent-deletion) for the contract. Deploy both `functions:api` and Hosting; do not reseed production for this change.
+
+## Permanent people deletion
+
+API version 1.5.0 adds `DELETE /guests/{id}` and `POST /guests/bulk-delete` (up to 50 guest codes). The admin UI requires typing **delete** and processes groups of 10. Each transaction removes guest/companion/contribution records, releases claimed food slots (retaining active flags and unit locks), and redacts matching public-registration receipts to fingerprint/deletedAt tombstones. Existing invitation links/replies return 404; identical original registration retries return 410 REGISTRATION_DELETED and cannot recreate the deleted person. Missing IDs can be retried safely, including orphan cleanup. Targeted single-field queries use existing automatic indexes; no new index, secret or migration is required. Deploy `functions:api` and Hosting together. See the [admin guide](admin-dashboard/README.md#delete-people) and [API contract](../api-spec/APISPECS.md#permanent-people-deletion).

@@ -1,13 +1,17 @@
-import { useEffect, useRef, useState } from "react";
-import { allGuests, api, downloadReport } from "./api.js";
+import { Children, cloneElement, useEffect, useRef, useState } from "react";
+import { allGuests, api, downloadCsv } from "./api.js";
 import Gallery from "./Gallery.jsx";
+import { FoodImport, FoodDelete } from "./FoodOperations.jsx";
+import { PeopleDelete } from "./PeopleOperations.jsx";
 
+const churchId = "wpvlhc-aog";
+const churchName = "World Prayer Vision Life Healing Center · AOG";
 const tabs = [
   ["overview", "Overview"],
-  ["guests", "Invitations"],
+  ["guests", "People"],
   ["food", "Food & drinks"],
-  ["churches", "Churches"],
-  ["contributions", "Contributions"],
+  ["churches", "Church settings"],
+  ["contributions", "Who is bringing what"],
   ["gallery", "Photo gallery"],
 ];
 const statusText = {
@@ -27,12 +31,18 @@ function Table({ headers, children }) {
       <table>
         <thead>
           <tr>
+            <th scope="col" className="row-number">#</th>
             {headers.map((label) => (
-              <th key={label}>{label}</th>
+              <th scope="col" key={label}>{label}</th>
             ))}
           </tr>
         </thead>
-        <tbody>{children}</tbody>
+        <tbody>
+          {Children.toArray(children).map((row, index) => cloneElement(row, {}, [
+            <th scope="row" className="row-number" key="row-number">{index + 1}</th>,
+            ...Children.toArray(row.props.children),
+          ]))}
+        </tbody>
       </table>
     </div>
   );
@@ -63,10 +73,12 @@ function Modal({ labelledBy, wide = false, busy, onClose, children }) {
 function Login({ onLogin }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   async function submit(event) {
     event.preventDefault();
     setError("");
     setBusy(true);
+    setShowPassword(false);
     const form = new FormData(event.currentTarget);
     try {
       onLogin(
@@ -100,7 +112,7 @@ function Login({ onLogin }) {
         <p className="eyebrow">Church management</p>
         <h2>Welcome back</h2>
         <p className="muted">
-          Manage invitations, plan the table, and bring the evening together.
+          Manage registrations, plan the table, and bring the evening together.
         </p>
         <label>
           Username
@@ -111,16 +123,32 @@ function Login({ onLogin }) {
             maxLength={120}
           />
         </label>
-        <label>
-          Password
+        <label htmlFor="admin-password">Password</label>
+        <div className="password-field">
           <input
+            id="admin-password"
             name="password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             required
             maxLength={72}
           />
-        </label>
+          <button
+            type="button"
+            className="password-toggle"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-controls="admin-password"
+            aria-pressed={showPassword}
+            disabled={busy}
+            onClick={() => setShowPassword((visible) => !visible)}
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+              <circle cx="12" cy="12" r="3" />
+              {showPassword && <path d="m3 3 18 18" />}
+            </svg>
+          </button>
+        </div>
         {error && (
           <p role="alert" className="error">
             {error}
@@ -132,7 +160,7 @@ function Login({ onLogin }) {
   );
 }
 
-function RecordEditor({ editor, churches, onClose, onSave }) {
+function RecordEditor({ editor, onClose, onSave }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const { kind, record = {} } = editor;
@@ -149,7 +177,7 @@ function RecordEditor({ editor, churches, onClose, onSave }) {
     };
     if (guest)
       Object.assign(body, {
-        churchId: form.get("churchId"),
+        churchId,
         personalizedName: form.get("personalizedName").trim(),
       });
     if (food)
@@ -175,7 +203,7 @@ function RecordEditor({ editor, churches, onClose, onSave }) {
         <div className="section-head">
           <h2 id="editor-title">
             {record.id ? "Edit" : "Add"}{" "}
-            {guest ? "invitation" : food ? "food item" : "church"}
+            {guest ? "person" : food ? "food item" : "church"}
           </h2>
           <button
             className="quiet"
@@ -207,28 +235,7 @@ function RecordEditor({ editor, churches, onClose, onSave }) {
                 placeholder="Uses the person's name when blank"
               />
             </label>
-            <label>
-              Church
-              <select
-                name="churchId"
-                defaultValue={record.churchId || ""}
-                required
-              >
-                <option value="" disabled>
-                  Choose a church
-                </option>
-                {churches
-                  .filter(
-                    (church) => church.active || church.id === record.churchId,
-                  )
-                  .map((church) => (
-                    <option key={church.id} value={church.id}>
-                      {church.name}
-                      {!church.active ? " (inactive)" : ""}
-                    </option>
-                  ))}
-              </select>
-            </label>
+            <p className="muted">{churchName}</p>
           </>
         )}
         {food && (
@@ -298,6 +305,8 @@ function ReplyEditor({ guest, foods, onClose, onSave }) {
       notes,
     })),
   );
+  const [plusOne, setPlusOne] = useState(guest.plusOne === true);
+  const [plusOneName, setPlusOneName] = useState(guest.plusOneName || "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   function change(id, field, value) {
@@ -314,7 +323,12 @@ function ReplyEditor({ guest, foods, onClose, onSave }) {
     try {
       await api(`/guests/${guest.id}/reply`, {
         method: "POST",
-        body: { rsvp, items: rsvp === "yes" ? items : [] },
+        body: {
+          rsvp,
+          plusOne: rsvp === "yes" && plusOne,
+          plusOneName: rsvp === "yes" && plusOne ? plusOneName.trim() : "",
+          items: rsvp === "yes" ? items : [],
+        },
       });
       await onSave();
     } catch (failure) {
@@ -350,6 +364,16 @@ function ReplyEditor({ guest, foods, onClose, onSave }) {
         </label>
         {rsvp === "yes" && (
           <>
+            <label className="check">
+              <input type="checkbox" checked={plusOne} onChange={(event) => setPlusOne(event.target.checked)} />
+              Bringing a plus-one
+            </label>
+            {plusOne && (
+              <label>
+                Plus-one name
+                <input required maxLength={160} value={plusOneName} onChange={(event) => setPlusOneName(event.target.value)} />
+              </label>
+            )}
             <h3>Food contributions</h3>
             {items.map((item) => {
               const food = foods.find((row) => row.id === item.foodItemId);
@@ -455,7 +479,6 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [tab, setTab] = useState("overview");
-  const [churchId, setChurchId] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [data, setData] = useState(null);
@@ -464,12 +487,19 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [editor, setEditor] = useState(null);
   const [reply, setReply] = useState(null);
+  const [selectedFoods, setSelectedFoods] = useState(new Set());
+  const [foodDeletion, setFoodDeletion] = useState(null);
+  const [foodImport, setFoodImport] = useState(false);
+  const [selectedPeople, setSelectedPeople] = useState(new Set());
+  const [peopleDeletion, setPeopleDeletion] = useState(null);
   useEffect(() => {
     function expired() {
       setUser(null);
       setData(null);
       setEditor(null);
       setReply(null);
+      setFoodDeletion(null); setFoodImport(false); setSelectedFoods(new Set());
+      setPeopleDeletion(null); setSelectedPeople(new Set());
     }
     window.addEventListener("session-expired", expired);
     api("/session")
@@ -485,12 +515,16 @@ export default function App() {
     setError("");
     try {
       const [guests, { churches }, { foodItems }, report] = await Promise.all([
-        allGuests(),
+        allGuests(churchId),
         api("/churches"),
         api("/food-items"),
-        api("/reports/summary"),
+        api(`/reports/summary?churchId=${churchId}`),
       ]);
       setData({ guests, churches, foodItems, report });
+      const ids = new Set(foodItems.map((food) => food.id));
+      setSelectedFoods((selected) => new Set([...selected].filter((id) => ids.has(id))));
+      const guestIds = new Set(guests.map((guest) => guest.id));
+      setSelectedPeople((selected) => new Set([...selected].filter((id) => guestIds.has(id))));
     } catch (failure) {
       setError(failure.message);
     } finally {
@@ -500,6 +534,7 @@ export default function App() {
   useEffect(() => {
     if (user) load();
   }, [user]);
+  useEffect(() => { setSelectedPeople(new Set()); }, [tab]);
   async function perform(action) {
     setError("");
     setNotice("");
@@ -539,39 +574,47 @@ export default function App() {
   const report = data?.report;
   const filteredGuests = (data?.guests || []).filter(
     (guest) =>
-      (!churchId || guest.churchId === churchId) &&
+      guest.churchId === churchId &&
       (!status || guest.rsvp === status) &&
-      `${guest.name} ${guest.personalizedName}`
+      `${guest.name} ${guest.personalizedName || ""} ${guest.plusOneName || ""}`
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
-  const churches = data?.churches || [];
+  const church = data?.churches.find((row) => row.id === churchId);
+  const selectedPeopleInView = filteredGuests.filter((guest) => selectedPeople.has(guest.id));
   const contributions = (report?.contributions || []).filter(
-    (item) => !churchId || item.churchId === churchId,
-  );
-  const churchReport = report?.churches.find(
-    (church) => church.churchId === churchId,
-  );
-  const totals = (churchId ? churchReport : report?.totals) || {
+    (item) => item.churchId === churchId,
+  ).sort((a, b) => a.guestName.localeCompare(b.guestName) || a.foodName.localeCompare(b.foodName) || a.foodItemId.localeCompare(b.foodItemId));
+  const totals = report?.totals || {
     invited: 0,
     yes: 0,
     no: 0,
     pending: 0,
     contributors: 0,
+    plusOnes: 0,
+    attendingPeople: 0,
   };
-  const foodRows = (report?.foodItems || []).map((food) =>
-    churchId
-      ? {
-          ...food,
-          quantity: contributions
-            .filter((row) => row.foodItemId === food.foodItemId)
-            .reduce((total, row) => total + row.quantity, 0),
-          contributors: contributions.filter(
-            (row) => row.foodItemId === food.foodItemId,
-          ).length,
-        }
-      : food,
-  );
+  const foodRows = report?.foodItems || [];
+  const foodById = new Map((data?.foodItems || []).map((food) => [food.id, food]));
+  const selectedFoodCount = new Set(contributions.map((item) => item.foodItemId)).size;
+  const availableFoodCount = (data?.foodItems || []).filter((food) => food.active && !food.claimedBy).length;
+  const attendingPeople = totals.attendingPeople ?? totals.yes + (totals.plusOnes || 0);
+  const plusOnes = totals.plusOnes || 0;
+  function exportPeople() {
+    downloadCsv("gala-people.csv", ["#", "Name", "Plus-one name", "RSVP", "Status", "Invitation URL", "Responded at"],
+      filteredGuests.map((guest, index) => [index + 1, guest.name, guest.plusOneName || "", statusText[guest.rsvp], guest.active ? "Active" : "Inactive", guest.uniqueUrl, guest.respondedAt]));
+  }
+  function foodStatus(food) {
+    return food.active ? food.claimedBy ? "Taken" : "Available" : "Inactive";
+  }
+  function exportFoodList() {
+    downloadCsv("gala-food-list.csv", ["#", "Item", "Unit", "Description", "Status"],
+      data.foodItems.map((food, index) => [index + 1, food.name, food.unit, food.description, foodStatus(food)]));
+  }
+  function exportContributions() {
+    downloadCsv("gala-contributions.csv", ["#", "Name", "Contribution", "Quantity", "Unit", "Description", "Notes"],
+      contributions.map((item, index) => [index + 1, item.guestName, item.foodName, item.quantity, item.unit, foodById.get(item.foodItemId)?.description || "", item.notes]));
+  }
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -595,6 +638,7 @@ export default function App() {
                 setTab(id);
                 setSearch("");
                 setStatus("");
+                setSelectedPeople(new Set());
               }}
             >
               {name}
@@ -615,6 +659,8 @@ export default function App() {
                 await api("/logout", { method: "POST", body: {} });
                 setUser(null);
                 setData(null);
+                setFoodDeletion(null); setFoodImport(false); setSelectedFoods(new Set());
+                setPeopleDeletion(null); setSelectedPeople(new Set());
               })
             }
           >
@@ -631,11 +677,11 @@ export default function App() {
               {tab === "overview"
                 ? "A little planning. A wonderful evening together."
                 : tab === "guests"
-                  ? "Every person, their own invitation and a place at the table."
+                  ? "Registered guests, their plus-ones, and a place at the table."
                   : tab === "food"
                     ? "Keep the shared table organised, one contribution at a time."
                     : tab === "churches"
-                      ? "Bring every congregation into the celebration."
+                      ? "Settings for World Prayer Vision Life Healing Center."
                       : tab === "gallery"
                         ? "Share the memories, add your collection, and manage photo visibility."
                         : "See who is bringing what, with quantities and notes."}
@@ -664,108 +710,42 @@ export default function App() {
         ) : (
           <>
             <div className="toolbar">
-              <label>
-                Church
-                <select
-                  value={churchId}
-                  onChange={(event) => setChurchId(event.target.value)}
-                >
-                  <option value="">All churches</option>
-                  {churches.map((church) => (
-                    <option key={church.id} value={church.id}>
-                      {church.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="export-actions">
-                <button
-                  className="quiet"
-                  onClick={() =>
-                    perform(() => downloadReport("guests", churchId))
-                  }
-                >
-                  Guest report ↓
-                </button>
-                <button
-                  className="quiet"
-                  onClick={() =>
-                    perform(() => downloadReport("food", churchId))
-                  }
-                >
-                  Food report ↓
-                </button>
-              </div>
+              <p className="church-context">{church?.name || churchName}</p>
+              {tab === "overview" && (
+                <div className="export-actions">
+                  <button className="secondary" onClick={() => perform(exportPeople)}>Export people ↓</button>
+                  <button className="secondary" onClick={() => perform(exportFoodList)}>Export food list ↓</button>
+                </div>
+              )}
             </div>
             {tab === "overview" && (
               <>
                 <div className="stats">
                   {[
-                    ["Invited", totals.invited],
-                    ["Attending", totals.yes],
-                    ["Awaiting reply", totals.pending],
-                    ["Bringing something", totals.contributors],
-                  ].map(([label, value]) => (
+                    ["People coming", attendingPeople, `${totals.yes} registration${totals.yes === 1 ? "" : "s"} · ${plusOnes} plus-one${plusOnes === 1 ? "" : "s"}`],
+                    ["Bringing something", totals.contributors, "Confirmed registered contributors"],
+                    ["Food items selected", selectedFoodCount, "Food slots from confirmed contributions"],
+                    ["Food items left", availableFoodCount, "Active food slots still available to choose"],
+                  ].map(([label, value, detail]) => (
                     <article className="stat" key={label}>
                       <span>{label}</span>
                       <strong>{value}</strong>
-                      <small>
-                        {label === "Invited"
-                          ? "Active invitations"
-                          : label === "Attending"
-                            ? `${totals.no} declined`
-                            : label === "Awaiting reply"
-                              ? "A friendly follow-up helps"
-                              : "Confirmed contributors"}
-                      </small>
+                      <small>{detail}</small>
                     </article>
                   ))}
                 </div>
                 <section className="panel">
                   <div className="section-head">
-                    <h2>Attendance by church</h2>
-                    <span className="muted">
-                      {totals.invited
-                        ? Math.round((totals.yes / totals.invited) * 100)
-                        : 0}
-                      % attending
-                    </span>
+                    <h2>Registration summary</h2>
+                    <button className="quiet" onClick={() => setTab("guests")}>View people ↗</button>
                   </div>
-                  {!churches.length ? (
-                    <Empty>
-                      Add your first church to start creating invitations.
-                    </Empty>
-                  ) : (
-                    <Table
-                      headers={[
-                        "Church",
-                        "Invited",
-                        "Attending",
-                        "Declined",
-                        "Pending",
-                      ]}
-                    >
-                      {report.churches
-                        .filter(
-                          (church) => !churchId || church.churchId === churchId,
-                        )
-                        .map((church) => (
-                          <tr key={church.churchId}>
-                            <td>
-                              <strong>{church.name}</strong>
-                            </td>
-                            <td>{church.invited}</td>
-                            <td>{church.yes}</td>
-                            <td>{church.no}</td>
-                            <td>{church.pending}</td>
-                          </tr>
-                        ))}
-                    </Table>
-                  )}
+                  <Table headers={["Response", "Registrations", "People confirmed"]}>
+                    <tr><td>Attending</td><td>{totals.yes}</td><td>{attendingPeople}</td></tr>
+                  </Table>
                 </section>
                 <section className="panel">
                   <div className="section-head">
-                    <h2>For the shared table</h2>
+                    <h2>Food items</h2>
                     <button
                       className="quiet"
                       onClick={() => setTab("contributions")}
@@ -805,18 +785,16 @@ export default function App() {
               <section className="panel">
                 <div className="section-head">
                   <h2>
-                    Personal invitations <small>{filteredGuests.length}</small>
+                    Registered people <small>{filteredGuests.length}</small>
                   </h2>
-                  <button
-                    onClick={() => setEditor({ kind: "guests" })}
-                    disabled={!churches.some((church) => church.active)}
-                  >
-                    Add invitation +
-                  </button>
+                  <div className="section-actions">
+                    <button className="secondary" onClick={() => perform(exportPeople)}>Export people ↓</button>
+                    <button onClick={() => setEditor({ kind: "guests" })} disabled={!church?.active}>Add person +</button>
+                  </div>
                 </div>
-                {!churches.some((church) => church.active) && (
+                {!church?.active && (
                   <p className="notice">
-                    Add an active church before creating invitations.
+                    Activate World Prayer Vision in Church settings before adding people.
                   </p>
                 )}
                 <div className="filters">
@@ -825,15 +803,15 @@ export default function App() {
                     <input
                       type="search"
                       value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Search by name"
+                      onChange={(event) => { setSearch(event.target.value); setSelectedPeople(new Set()); }}
+                      placeholder="Search by name or plus-one"
                     />
                   </label>
                   <label>
                     Reply
                     <select
                       value={status}
-                      onChange={(event) => setStatus(event.target.value)}
+                      onChange={(event) => { setStatus(event.target.value); setSelectedPeople(new Set()); }}
                     >
                       <option value="">All replies</option>
                       {Object.entries(statusText).map(([id, label]) => (
@@ -844,29 +822,33 @@ export default function App() {
                     </select>
                   </label>
                 </div>
+                <div className="food-bulk-actions">
+                  <label className="check"><input type="checkbox" aria-label="Select all shown people" checked={filteredGuests.length > 0 && selectedPeopleInView.length === filteredGuests.length} ref={(node) => { if (node) node.indeterminate = selectedPeopleInView.length > 0 && selectedPeopleInView.length < filteredGuests.length; }} onChange={(event) => setSelectedPeople(event.target.checked ? new Set(filteredGuests.map((guest) => guest.id)) : new Set())} />Select all shown people</label>
+                  <span className="muted">{selectedPeopleInView.length} selected</span>
+                  <button className="secondary danger" disabled={!selectedPeopleInView.length} onClick={() => setPeopleDeletion(selectedPeopleInView)}>Delete selected ({selectedPeopleInView.length})</button>
+                </div>
                 <Table
                   headers={[
-                    "Person",
-                    "Church",
+                    "Select",
+                    "Name",
+                    "Plus-one",
                     "Reply",
                     "Invitation",
                     "Manage",
                   ]}
                 >
-                  {filteredGuests.map((guest) => (
+                  {filteredGuests.map((guest, index) => (
                     <tr key={guest.id}>
+                      <td><input className="row-checkbox" type="checkbox" aria-label={`Select person ${index + 1}: ${guest.name}`} checked={selectedPeople.has(guest.id)} onChange={(event) => setSelectedPeople((selected) => { const next = new Set(selected); if (event.target.checked) next.add(guest.id); else next.delete(guest.id); return next; })} /></td>
                       <td>
                         <strong>{guest.name}</strong>
+                        <small className="description">{guest.registrationSource === "public" ? "Registered" : "Personal invitation"}</small>
                         {!guest.active && (
                           <small className="inactive">Inactive</small>
                         )}
                       </td>
                       <td>
-                        {
-                          churches.find(
-                            (church) => church.id === guest.churchId,
-                          )?.name
-                        }
+                        {guest.plusOne ? guest.plusOneName : "—"}
                       </td>
                       <td>
                         <Status value={guest.rsvp} />
@@ -905,75 +887,55 @@ export default function App() {
                         >
                           Reply
                         </button>
+                        <button className="quiet danger" onClick={() => setPeopleDeletion([guest])}>Delete</button>
                       </td>
                     </tr>
                   ))}
                 </Table>
                 {!filteredGuests.length && (
-                  <Empty>No invitations match this view.</Empty>
+                  <Empty>No people match this view.</Empty>
                 )}
               </section>
             )}
             {tab === "churches" && (
               <section className="panel">
-                <div className="section-head">
-                  <h2>Church directory</h2>
-                  <button onClick={() => setEditor({ kind: "churches" })}>
-                    Add church +
-                  </button>
-                </div>
-                <Table headers={["Church", "Status", "Manage"]}>
-                  {churches
-                    .filter((church) => !churchId || church.id === churchId)
-                    .map((church) => (
-                      <tr key={church.id}>
-                        <td>
-                          <strong>{church.name}</strong>
-                        </td>
-                        <td>{church.active ? "Active" : "Inactive"}</td>
-                        <td>
-                          <button
-                            className="quiet"
-                            onClick={() =>
-                              setEditor({ kind: "churches", record: church })
-                            }
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </Table>
-                {!churches.length && (
-                  <Empty>No churches yet. Add the first congregation.</Empty>
-                )}
+                <div className="section-head"><h2>Church settings</h2></div>
+                {church ? (
+                  <Table headers={["Church", "Status", "Manage"]}>
+                    <tr>
+                      <td><strong>{church.name}</strong></td>
+                      <td>{church.active ? "Active" : "Inactive"}</td>
+                      <td><button className="quiet" onClick={() => setEditor({ kind: "churches", record: church })}>Edit</button></td>
+                    </tr>
+                  </Table>
+                ) : <Empty>World Prayer Vision needs to be restored in the event setup before people can register.</Empty>}
               </section>
             )}
             {tab === "food" && (
               <section className="panel">
                 <div className="section-head">
                   <h2>Food & drink catalogue</h2>
-                  <button onClick={() => setEditor({ kind: "food-items" })}>
-                    Add food item +
-                  </button>
+                  <div className="section-actions">
+                    <button className="secondary" onClick={() => perform(exportFoodList)}>Export food list ↓</button>
+                    <button className="secondary" onClick={() => setFoodImport(true)}>Import CSV ↑</button>
+                    <button onClick={() => setEditor({ kind: "food-items" })}>Add food item +</button>
+                  </div>
                 </div>
-                <Table headers={["Item", "Unit", "Status", "Manage"]}>
+                <div className="food-bulk-actions">
+                  <label className="check"><input type="checkbox" aria-label="Select all food items" checked={data.foodItems.length > 0 && selectedFoods.size === data.foodItems.length} ref={(node) => { if (node) node.indeterminate = selectedFoods.size > 0 && selectedFoods.size < data.foodItems.length; }} onChange={(event) => setSelectedFoods(event.target.checked ? new Set(data.foodItems.map((food) => food.id)) : new Set())} />Select all food items</label>
+                  <span className="muted">{selectedFoods.size} selected</span>
+                  <button className="secondary danger" disabled={!selectedFoods.size} onClick={() => setFoodDeletion(data.foodItems.filter((food) => selectedFoods.has(food.id)))}>Delete selected ({selectedFoods.size})</button>
+                </div>
+                <Table headers={["Select", "Item", "Unit", "Description", "Status", "Manage"]}>
                   {data.foodItems.map((food) => (
                     <tr key={food.id}>
+                      <td><input className="row-checkbox" type="checkbox" aria-label={`Select ${food.name} (${food.id})`} checked={selectedFoods.has(food.id)} onChange={(event) => setSelectedFoods((selected) => { const next = new Set(selected); if (event.target.checked) next.add(food.id); else next.delete(food.id); return next; })} /></td>
                       <td>
                         <strong>{food.name}</strong>
-                        <small className="description">
-                          {food.description}
-                        </small>
                       </td>
                       <td>{food.unit}</td>
-                      <td>
-                        {food.active
-                          ? food.claimedBy
-                            ? "Taken"
-                            : "Available"
-                          : "Inactive"}
-                      </td>
+                      <td>{food.description || "—"}</td>
+                      <td>{foodStatus(food)}</td>
                       <td>
                         <button
                           className="quiet"
@@ -983,6 +945,7 @@ export default function App() {
                         >
                           Edit
                         </button>
+                        <button className="quiet danger" onClick={() => setFoodDeletion([food])}>Delete</button>
                       </td>
                     </tr>
                   ))}
@@ -999,13 +962,15 @@ export default function App() {
                   <span className="muted">
                     {contributions.length} food commitments
                   </span>
+                  <button className="secondary" onClick={() => perform(exportContributions)}>Export contributions ↓</button>
                 </div>
                 <Table
                   headers={[
-                    "Person",
-                    "Church",
-                    "Food or drink",
+                    "Name",
+                    "Contribution",
                     "Quantity",
+                    "Unit",
+                    "Description",
                     "Notes",
                   ]}
                 >
@@ -1014,11 +979,10 @@ export default function App() {
                       <td>
                         <strong>{item.guestName}</strong>
                       </td>
-                      <td>{item.churchName}</td>
                       <td>{item.foodName}</td>
-                      <td>
-                        {item.quantity} {item.unit}
-                      </td>
+                      <td>{item.quantity}</td>
+                      <td>{item.unit}</td>
+                      <td>{foodById.get(item.foodItemId)?.description || "—"}</td>
                       <td>{item.notes || "—"}</td>
                     </tr>
                   ))}
@@ -1046,7 +1010,6 @@ export default function App() {
         {editor && (
           <RecordEditor
             editor={editor}
-            churches={churches}
             onClose={() => setEditor(null)}
             onSave={saved}
           />
@@ -1059,6 +1022,9 @@ export default function App() {
             onSave={saved}
           />
         )}
+        {foodImport && <FoodImport Modal={Modal} onClose={() => setFoodImport(false)} onRefresh={load} />}
+        {foodDeletion && <FoodDelete Modal={Modal} foods={foodDeletion} onClose={() => setFoodDeletion(null)} onRefresh={load} onDeleted={(ids) => setSelectedFoods((selected) => new Set([...selected].filter((id) => !ids.includes(id))))} />}
+        {peopleDeletion && <PeopleDelete Modal={Modal} people={peopleDeletion} onClose={() => setPeopleDeletion(null)} onRefresh={load} onDeleted={(ids) => setSelectedPeople((selected) => new Set([...selected].filter((id) => !ids.includes(id))))} />}
       </main>
     </div>
   );
