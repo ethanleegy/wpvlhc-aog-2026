@@ -13,10 +13,12 @@ function showPage() {
 const rsvpForm = document.querySelector("#rsvp");
 const bringSection = document.querySelector("#bring");
 const guestDetails = document.querySelector("#guest-details");
-const plusOneCheckbox = document.querySelector("#plus-one");
+const plusOneYesRadio = document.querySelector("#plus-one");
+const plusOneNoRadio = document.querySelector("#plus-one-no");
 const plusOneDetails = document.querySelector("#plus-one-details");
 const plusOneNameInput = document.querySelector("#plus-one-name");
 const rsvpMessage = document.querySelector("#rsvp-message");
+const contributionPrompt = document.querySelector("#contribution-prompt");
 const submitButton = document.querySelector("#submit");
 const submitWrapper = document.querySelector("#submit-wrapper");
 const dishForm = document.querySelector("#dish-form");
@@ -106,10 +108,11 @@ async function loadFoodItems() {
 if (rsvpForm && dishForm) {
   loadFoodItems();
   rsvpForm.addEventListener("change", (event) => {
-    if (event.target === plusOneCheckbox) {
-      plusOneDetails.hidden = !plusOneCheckbox.checked;
-      plusOneNameInput.required = plusOneCheckbox.checked;
-      if (!plusOneCheckbox.checked) plusOneNameInput.value = "";
+    if (event.target.name === "plusOneChoice") {
+      const bringingPlusOne = plusOneYesRadio.checked;
+      plusOneDetails.hidden = !bringingPlusOne;
+      plusOneNameInput.required = bringingPlusOne;
+      if (!bringingPlusOne) plusOneNameInput.value = "";
       return;
     }
 
@@ -118,14 +121,13 @@ if (rsvpForm && dishForm) {
     guestDetails.hidden = !attending;
     bringSection.hidden = !attending;
     submitWrapper.hidden = !attending;
-    rsvpMessage.textContent = attending
-      ? "Scroll down to choose what to bring and submit your RSVP ↓"
-      : "We’ll miss you, and hope to celebrate with you another time. No response was submitted.";
+    contributionPrompt.hidden = !attending;
+    rsvpMessage.textContent = attending ? "" : "Maybe next time";
 
     if (!attending) {
       dishForm.reset();
       updateDishCount();
-      plusOneCheckbox.checked = false;
+      plusOneNoRadio.checked = true;
       plusOneDetails.hidden = true;
       plusOneNameInput.required = false;
       plusOneNameInput.value = "";
@@ -157,7 +159,7 @@ async function submitResponse(event) {
     return;
   }
 
-  const isBringingPlusOne = plusOneCheckbox.checked;
+  const isBringingPlusOne = plusOneYesRadio.checked;
   const submittedPlusOneName = plusOneNameInput.value.trim();
   if (isBringingPlusOne && !submittedPlusOneName) {
     rsvpMessage.textContent = "Please enter your plus-one’s name.";

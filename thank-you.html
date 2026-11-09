@@ -4,14 +4,18 @@ title: Thank You
 permalink: /thank-you/
 ---
 <main class="flex min-h-screen flex-col items-center bg-paper px-6 pt-[18vh] pb-16 text-center">
-  <div>
-    <img class="mb-6 size-4" src="{{ '/assets/images/favicon-16x16.png' | relative_url }}" alt="" aria-hidden="true">
-    <h1 class="m-0 font-display text-[clamp(48px,8vw,88px)] leading-none font-normal tracking-[-.06em] text-forest">Thank you!</h1>
+  <div class="flex flex-col items-center">
+    <img class="mb-6 size-5" src="{{ '/assets/images/favicon-16x16.png' | relative_url }}" alt="" aria-hidden="true">
+    <h1 class="m-0 font-display text-[clamp(48px,8vw,88px)] leading-none font-normal tracking-[-.05em] text-forest">Thank you!<br><span class="text-[.5em] text-red tracking-[-.045em]">See you there!</span></h1>
   </div>
-  <a
-    class="mt-auto border-b border-black pb-1 font-display text-lg text-black transition-colors hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red"
-    href="https://ivory-gy.com"
-    target="_blank"
-    rel="noopener noreferrer"
-  >Have an event of your own?</a>
+  <div class="mt-auto flex flex-col items-center justify-center gap-3 font-display text-lg text-black">
+    <span class="leading-[1.2]"><span class="underline underline-offset-4">Have an event of your own?</span><br><span class="text-xs">Create something memorable with</span></span>
+    <a
+      class="inline-flex w-28 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red"
+      href="https://ivory-gy.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Visit Ivory"
+    ><img class="h-auto w-full" src="{{ '/assets/images/ivory-logo_black.svg' | relative_url }}" alt="Ivory"></a>
+  </div>
 </main>
