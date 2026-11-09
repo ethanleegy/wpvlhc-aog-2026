@@ -42,7 +42,7 @@ export async function downloadReport(kind, churchId) {
     `/reports/${kind}.csv${churchId ? `?churchId=${encodeURIComponent(churchId)}` : ""}`,
     { download: true },
   );
-  saveDownload(blob, `gala-${kind}.csv`);
+  saveDownload(blob, `christmas-social-${kind}.csv`);
 }
 
 function csvCell(value) {

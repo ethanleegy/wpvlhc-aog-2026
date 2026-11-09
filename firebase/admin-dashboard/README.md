@@ -2,7 +2,7 @@
 
 React + Vite management for WPVLHC AOG's December 2026 Christmas Social. Uses the Node/Firestore backend in `../functions`; it contains no browser Firestore SDK, database credentials or stored admin password.
 
-This naming update covers documentation and the backend. Frontend source branding, browser-generated `gala-*.csv` filenames and `GALA_TEST_*` test variables remain unchanged. Direct backend CSV downloads now use `christmas-social-guests.csv` and `christmas-social-food.csv`.
+The React management app uses Christmas Social branding in its page title, headings, CSV exports, import template and photo-sharing QR download. Public Jekyll pages and the guest gallery are maintained separately by the public frontend developer. Direct backend CSV downloads use `christmas-social-guests.csv` and `christmas-social-food.csv`.
 
 ## Development
 
@@ -23,7 +23,7 @@ Open `http://127.0.0.1:5173`. Vite proxies `/v1` to `http://127.0.0.1:5001/demo-
 - **Food & drinks:** the complete catalogue, including available, taken and inactive options; add/edit/deactivate descriptions and units; delete single/selected items and import a CSV. Units lock after their first contribution.
 - **Church settings:** World Prayer Vision Life Healing Center only (`wpvlhc-aog`). The UI uses this existing church automatically when listing/creating people and loading reports. There are no multi-church selectors or create-church prompts; the existing API and other church records are unchanged. The default church must already exist from event setup; it can be edited/activated here.
 - **Who is bringing what:** numbered rows for primary name, contribution, quantity, unit, catalogue description and guest notes. Only active attending contributors are shown; companions do not double quantities.
-- **Exports:** `Export people` downloads the currently searched/filtered people as `gala-people.csv`, including companion names, status and private invitation URLs. `Export food list` downloads the entire catalogue as `gala-food-list.csv`, including unselected/inactive items. `Export contributions` downloads the visible commitment rows as `gala-contributions.csv`, including descriptions and notes. All lists/exports have a leftmost row number starting at 1; filtering renumbers the view. CSVs are generated on the device from loaded data using UTF-8 BOM, quoted cells, CRLF and formula neutralization. Refresh before exporting to load newer registrations. No API changes or additional report endpoints are required.
+- **Exports:** `Export people` downloads the currently searched/filtered people as `christmas-social-people.csv`, including companion names, status and private invitation URLs. `Export food list` downloads the entire catalogue as `christmas-social-food-list.csv`, including unselected/inactive items. `Export contributions` downloads the visible commitment rows as `christmas-social-contributions.csv`, including descriptions and notes. All lists/exports have a leftmost row number starting at 1; filtering renumbers the view. CSVs are generated on the device from loaded data using UTF-8 BOM, quoted cells, CRLF and formula neutralization. Refresh before exporting to load newer registrations. No API changes or additional report endpoints are required.
 
 Report times use `America/Guyana`. Data loads on sign-in, saving and Refresh; there is no live subscription. People loading follows all cursor pages for World Prayer Vision. Expired sessions return to sign-in and clear the management view.
 
@@ -67,7 +67,14 @@ Limits: 8 MB, 2,000 food rows, names 160 characters, units 40 and descriptions 5
 npm run admin:build
 ```
 
-Food deletion/import and people deletion add admin API routes. Deploy the API and admin together from the repository root after building:
+For this React branding update, deploy Hosting after building (start from the repository root):
+
+```sh
+cd firebase
+npx firebase deploy --only hosting --project wpvlhc-aog-2026
+```
+
+When shipping backend feature changes such as food deletion/import or people deletion, deploy the API and admin together after building:
 
 ```sh
 cd firebase

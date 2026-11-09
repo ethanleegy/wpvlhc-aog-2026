@@ -150,6 +150,8 @@ async function csvDownload(page, button, filename) {
 test("password visibility toggles without submitting and resets on sign-in", async ({ page }) => {
   const { calls } = await fixture(page, { signedIn: false });
   await page.goto("/");
+  await expect(page).toHaveTitle("Christmas Social management · WPVLHC");
+  await expect(page.getByText("Christmas Social · December 12, 2026", { exact: true })).toBeVisible();
   const password = page.getByLabel("Password", { exact: true });
   await password.fill("sample-password");
   await expect(password).toHaveAttribute("type", "password");
@@ -174,6 +176,8 @@ test("overview counts confirmed people, contributors, distinct selected slots an
   const { calls } = await fixture(page);
   const errors = []; page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await expect(page.locator(".brand")).toContainText("Christmas Social");
+  await expect(page.locator("body")).not.toContainText("Christmas Gala");
   await expect(stat(page, "People coming")).toHaveText("3");
   await expect(stat(page, "Bringing something")).toHaveText("2");
   await expect(stat(page, "Food items selected")).toHaveText("3");
@@ -203,16 +207,16 @@ test("people follow all pages, show companions, and export the numbered filtered
   await page.getByLabel("Find a person").fill("Jane");
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.locator("tbody th")).toHaveText("1");
-  const filtered = await csvDownload(page, "Export people ↓", "gala-people.csv");
+  const filtered = await csvDownload(page, "Export people ↓", "christmas-social-people.csv");
   expect(filtered.startsWith('\uFEFF"#","Name","Plus-one name"')).toBe(true);
   expect(filtered).toContain('"1","Alice Henry","Jane Henry","Attending"');
   expect(filtered).not.toContain("Ben Henry"); expect(filtered).not.toContain("Other church guest");
   await page.getByLabel("Find a person").fill("");
-  const all = await csvDownload(page, "Export people ↓", "gala-people.csv");
+  const all = await csvDownload(page, "Export people ↓", "christmas-social-people.csv");
   expect(all).toContain('"5","Erin Henry"'); expect(all).not.toContain("Other church guest");
   await page.getByRole("combobox", { name: "Reply", exact: true }).selectOption("no");
   await expect(page.locator("tbody th")).toHaveText("1");
-  const declined = await csvDownload(page, "Export people ↓", "gala-people.csv");
+  const declined = await csvDownload(page, "Export people ↓", "christmas-social-people.csv");
   expect(declined).toContain("Chloe Henry"); expect(declined).not.toContain("Alice Henry");
 });
 
@@ -220,7 +224,7 @@ test("catalogue and contribution exports are distinct, complete, numbered and sp
   await fixture(page); await page.goto("/");
   await page.getByRole("navigation").getByRole("button", { name: "Food & drinks", exact: true }).click();
   await expect(page.locator("tbody tr")).toHaveCount(7);
-  const catalogue = await csvDownload(page, "Export food list ↓", "gala-food-list.csv");
+  const catalogue = await csvDownload(page, "Export food list ↓", "christmas-social-food-list.csv");
   expect(catalogue).toContain('"#","Item","Unit","Description","Status"');
   expect(catalogue).toContain('"4","Cake","pieces","Homemade cake","Available"');
   expect(catalogue).toContain('"6","Old option","pieces","Closed","Inactive"');
@@ -231,7 +235,7 @@ test("catalogue and contribution exports are distinct, complete, numbered and sp
   await expect(page.locator("tbody tr")).toHaveCount(3);
   await expect(page.locator("tbody tr").first()).toContainText("12");
   await expect(page.locator("tbody tr").first()).toContainText("servings");
-  const contributions = await csvDownload(page, "Export contributions ↓", "gala-contributions.csv");
+  const contributions = await csvDownload(page, "Export contributions ↓", "christmas-social-contributions.csv");
   expect(contributions).toContain('"1","Alice Henry","Rice","12","servings"');
   expect(contributions).toContain('"3","Ben Henry","Juice","4","bottles","Fruit juice","Cold"');
   expect(contributions).toContain('"\'=HYPERLINK(""untrusted"")"');
@@ -281,7 +285,7 @@ test("empty registrations and catalogue show zero counts and usable empty states
   for (const name of ["People coming", "Bringing something", "Food items selected", "Food items left"]) await expect(stat(page, name)).toHaveText("0");
   await page.getByRole("navigation").getByRole("button", { name: "People", exact: true }).click();
   await expect(page.getByText("No people match this view.")).toBeVisible();
-  const csv = await csvDownload(page, "Export people ↓", "gala-people.csv");
+  const csv = await csvDownload(page, "Export people ↓", "christmas-social-people.csv");
   expect(csv.split("\r\n")).toHaveLength(2);
   await page.getByRole("navigation").getByRole("button", { name: "Who is bringing what", exact: true }).click();
   await expect(page.getByText("Contributions appear here", { exact: false })).toBeVisible();
@@ -345,7 +349,7 @@ test("CSV imports preview rows, reject invalid files without writes and add sepa
   await page.getByRole("navigation").getByRole("button", { name: "Food & drinks", exact: true }).click();
   await page.getByRole("button", { name: "Import CSV ↑", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  const template = await csvDownload(page, "Download CSV template ↓", "gala-food-template.csv");
+  const template = await csvDownload(page, "Download CSV template ↓", "christmas-social-food-template.csv");
   expect(template).toContain('"Name","Unit","Description","Active"');
   await dialog.getByLabel("Choose food CSV").setInputFiles({ name: "bad.csv", mimeType: "text/csv", buffer: Buffer.from("Name,Unit\nRice,") });
   await expect(dialog.getByRole("alert")).toContainText("unit");

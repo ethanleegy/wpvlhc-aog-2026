@@ -59,7 +59,7 @@ export function FoodImport({ Modal, onClose, onRefresh }) {
     <Modal labelledBy="food-import-title" wide busy={busy} onClose={onClose}>
       <div className="section-head"><h2 id="food-import-title">Import food items from CSV</h2><button className="quiet" disabled={busy} onClick={onClose}>Close</button></div>
       <p className="muted">One row creates one new food slot. Repeated names create separate slots. Existing items and guest selections stay as they are.</p>
-      <button className="secondary" disabled={busy} onClick={() => downloadCsv("gala-food-template.csv", ["Name", "Unit", "Description", "Active"], [["Baked chicken", "servings", "Bring cooked", "true"], ["Fruit juice", "bottles", "Chilled", "true"]])}>Download CSV template ↓</button>
+      <button className="secondary" disabled={busy} onClick={() => downloadCsv("christmas-social-food-template.csv", ["Name", "Unit", "Description", "Active"], [["Baked chicken", "servings", "Bring cooked", "true"], ["Fruit juice", "bottles", "Chilled", "true"]])}>Download CSV template ↓</button>
       {!plan || done ? <label>Choose food CSV<input type="file" accept=".csv,text/csv" disabled={busy} onChange={choose} /></label> : (
         <>
           <p>{plan.fileName} · {items.length} food items</p>

@@ -17,7 +17,7 @@ test("device compression, automatic publication, bulk hide/show, prior approval 
     const canvas = document.createElement("canvas"); canvas.width = 2400; canvas.height = 1800;
     const context = canvas.getContext("2d"), gradient = context.createLinearGradient(0, 0, 2400, 1800);
     gradient.addColorStop(0, "#b17a40"); gradient.addColorStop(1, "#153b2b"); context.fillStyle = gradient; context.fillRect(0, 0, 2400, 1800);
-    context.fillStyle = "white"; context.font = "100px sans-serif"; context.fillText("Christmas Gala · local test", 120, 900);
+    context.fillStyle = "white"; context.font = "100px sans-serif"; context.fillText("Christmas Social · local test", 120, 900);
     return canvas.toDataURL("image/png");
   });
   const buffer = Buffer.from(dataUrl.split(",")[1], "base64"), suffix = Date.now().toString(36);

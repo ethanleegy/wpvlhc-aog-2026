@@ -106,7 +106,7 @@ function Login({ onLogin }) {
           <br />
           <em>everyone.</em>
         </h1>
-        <p>Christmas Gala · December 12, 2026</p>
+        <p>Christmas Social · December 12, 2026</p>
       </div>
       <form className="login-card" onSubmit={submit}>
         <p className="eyebrow">Church management</p>
@@ -601,18 +601,18 @@ export default function App() {
   const attendingPeople = totals.attendingPeople ?? totals.yes + (totals.plusOnes || 0);
   const plusOnes = totals.plusOnes || 0;
   function exportPeople() {
-    downloadCsv("gala-people.csv", ["#", "Name", "Plus-one name", "RSVP", "Status", "Invitation URL", "Responded at"],
+    downloadCsv("christmas-social-people.csv", ["#", "Name", "Plus-one name", "RSVP", "Status", "Invitation URL", "Responded at"],
       filteredGuests.map((guest, index) => [index + 1, guest.name, guest.plusOneName || "", statusText[guest.rsvp], guest.active ? "Active" : "Inactive", guest.uniqueUrl, guest.respondedAt]));
   }
   function foodStatus(food) {
     return food.active ? food.claimedBy ? "Taken" : "Available" : "Inactive";
   }
   function exportFoodList() {
-    downloadCsv("gala-food-list.csv", ["#", "Item", "Unit", "Description", "Status"],
+    downloadCsv("christmas-social-food-list.csv", ["#", "Item", "Unit", "Description", "Status"],
       data.foodItems.map((food, index) => [index + 1, food.name, food.unit, food.description, foodStatus(food)]));
   }
   function exportContributions() {
-    downloadCsv("gala-contributions.csv", ["#", "Name", "Contribution", "Quantity", "Unit", "Description", "Notes"],
+    downloadCsv("christmas-social-contributions.csv", ["#", "Name", "Contribution", "Quantity", "Unit", "Description", "Notes"],
       contributions.map((item, index) => [index + 1, item.guestName, item.foodName, item.quantity, item.unit, foodById.get(item.foodItemId)?.description || "", item.notes]));
   }
   return (
@@ -625,7 +625,7 @@ export default function App() {
         >
           <span className="brand-mark">✳</span>
           <span>
-            Christmas Gala<small>WPVLHC · Assembly of God</small>
+            Christmas Social<small>WPVLHC · Assembly of God</small>
           </span>
         </a>
         <p className="eyebrow nav-label">Plan the evening</p>

@@ -102,7 +102,7 @@ export default function Gallery() {
           <label className="gallery-toggle"><input type="checkbox" checked={settings.adminUploadsOpen} disabled={busy} onChange={e => changeSetting("adminUploadsOpen", e.target.checked)} />Admin uploads open</label>
           <p className="small muted">Reserved storage: {mb(settings.capacity.reservedBytes)} of {mb(settings.limits.storageBytes)} · {settings.capacity.photoCount} photos. Free allowance review due {new Date(settings.billingEnd).toLocaleDateString()}.</p>
         </div>
-        <div className="gallery-qr">{qr && <><img src={qr} width="180" height="180" alt="QR code for guest photo sharing" /><a className="quiet" href={qr} download="gala-photo-sharing-qr.png">Download QR</a></>}<a href={settings.uploadUrl} target="_blank" rel="noreferrer">Open guest sharing ↗</a></div>
+        <div className="gallery-qr">{qr && <><img src={qr} width="180" height="180" alt="QR code for guest photo sharing" /><a className="quiet" href={qr} download="christmas-social-photo-sharing-qr.png">Download QR</a></>}<a href={settings.uploadUrl} target="_blank" rel="noreferrer">Open guest sharing ↗</a></div>
       </div>
       <section className="panel gallery-upload"><h2>Add your photos</h2><p className="muted">Select your collection. Photos are compressed on this device and uploaded a few at a time. Keep this page open.</p>
         <div className="gallery-controls">

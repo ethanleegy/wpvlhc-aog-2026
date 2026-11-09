@@ -84,7 +84,7 @@ test("management creates an invitation, records food, exports reports and signs 
   const downloadEvent = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export contributions ↓" }).click();
   const download = await downloadEvent;
-  expect(download.suggestedFilename()).toBe("gala-contributions.csv");
+  expect(download.suggestedFilename()).toBe("christmas-social-contributions.csv");
   expect(await download.failure()).toBeNull();
 
   await page.getByRole("button", { name: "Overview", exact: false }).click();

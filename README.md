@@ -2,7 +2,7 @@
 
 Personal invitations, RSVP and shared food planning for World Prayer Vision Life Healing Center Assembly of God, December 12, 2026.
 
-The event name is **Christmas Social 2026**. Existing `gala-2026` data/storage namespaces, `gala-food-*` IDs and `wpvlhc-gala-*` hostnames/Cloudflare resources are retained as technical identifiers so existing records, images, links and retry receipts keep working. A branding change does not migrate these resources. Frontend source branding and browser-generated filenames are outside this backend/documentation update.
+The event name is **Christmas Social 2026**. Existing `gala-2026` data/storage namespaces, `gala-food-*` IDs and `wpvlhc-gala-*` hostnames/Cloudflare resources are retained as technical identifiers so existing records, images, links and retry receipts keep working. A branding change does not migrate these resources. The React management app uses Christmas Social branding and download filenames. Public Jekyll pages and guest-gallery branding are maintained separately by the public frontend developer.
 
 The public site remains Jekyll + Tailwind CSS. The backend and React management application live independently in `firebase/`, following [2026-tevin-and-natallia](https://github.com/TaricoHenry/2026-tevin-and-natallia) and [ashley-and-navin](https://github.com/TaricoHenry/ashley-and-navin).
 

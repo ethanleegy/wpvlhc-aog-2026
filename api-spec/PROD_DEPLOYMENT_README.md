@@ -6,7 +6,7 @@ The two review findings have been fixed: guest authorization now restores/renews
 
 Printable companion: [deployment and readiness PDF](../output/pdf/Gallery_Deployment_and_Readiness_Guide.pdf).
 
-The event is named **Christmas Social**. Existing hostnames, Worker/bucket names and `gala-2026` storage/database keys below retain their deployed spelling; they are not display branding. Frontend source and the historical printable PDF are separate from this documentation/backend naming update.
+The event is named **Christmas Social**. Existing hostnames, Worker/bucket names and `gala-2026` storage/database keys below retain their deployed spelling; they are not display branding. React management uses Christmas Social branding. Public Jekyll/guest-gallery source and the historical printable PDF are maintained separately.
 
 ## Verified local result
 
