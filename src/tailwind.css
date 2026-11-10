@@ -143,7 +143,7 @@ html[data-scroll-animations="ready"] [data-scroll-visible="true"] {
 }
 
 .thank-you-ivory {
-  animation: thank-you-rise 2000ms cubic-bezier(.22, 1, .36, 1) 1s both;
+  animation: thank-you-rise 2000ms cubic-bezier(.22, 1, .36, 1) 0.5s both;
 }
 
 @keyframes thank-you-rise {

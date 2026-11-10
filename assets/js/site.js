@@ -62,9 +62,10 @@ document.querySelectorAll('a[href="#invitation"], a[href="#bring"]').forEach((li
 
     const animateScroll = (time) => {
       const progress = Math.min((time - startTime) / duration, 1);
-      const easedProgress = progress < 0.5
+      const smoothProgress = progress < 0.5
         ? 4 * progress ** 3
         : 1 - ((-2 * progress + 2) ** 3) / 2;
+      const easedProgress = progress * 0.2 + smoothProgress * 0.8;
       window.scrollTo(0, startY + distance * easedProgress);
 
       if (progress < 1) {
