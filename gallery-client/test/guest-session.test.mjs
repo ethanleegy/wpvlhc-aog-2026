@@ -11,7 +11,43 @@ function storage(saved) {
 }
 test("a reloaded guest restores a valid saved session before authorizing", async () => {
   const getToken = createGuestSession({ api: () => { throw new Error("Should reuse the saved session"); }, storage: () => storage(session("saved-token")), now: () => start });
+  assert.equal(getToken.hasValidSession(), true);
   assert.equal(await getToken(), "saved-token");
+});
+test("concurrent photos wait for verification before sending one session request", async () => {
+  let finish, calls = 0, checks = 0;
+  const challenge = new Promise(resolve => { finish = resolve; });
+  const getToken = createGuestSession({ storage: () => storage(), now: () => start, getVerification: () => { checks++; return challenge; }, api: async (_, body) => {
+    calls++; assert.equal(body.turnstileToken, "completed-challenge"); return session("verified-session");
+  } });
+  const first = getToken(), second = getToken();
+  await Promise.resolve();
+  assert.equal(calls, 0); assert.equal(checks, 1); assert.equal(getToken.hasValidSession(), false); assert.equal(getToken.isPending(), true);
+  finish("completed-challenge");
+  assert.deepEqual(await Promise.all([first, second]), ["verified-session", "verified-session"]);
+  assert.equal(calls, 1); assert.equal(getToken.hasValidSession(), true); assert.equal(getToken.isPending(), false);
+});
+test("missing verification makes no session request and does not reset a pending challenge", async () => {
+  let calls = 0, resets = 0;
+  const getToken = createGuestSession({ storage: () => storage(), getVerification: () => { throw new Error("Still verifying"); },
+    api: async () => { calls++; }, onSessionError: () => { resets++; } });
+  await assert.rejects(getToken(), /Still verifying/);
+  assert.equal(calls, 0); assert.equal(resets, 0);
+});
+test("a rejected shared session resets verification once and can recover with a fresh token", async () => {
+  let resets = 0;
+  const tokens = [];
+  const getToken = createGuestSession({ storage: () => storage(), now: () => start, getVerification: () => resets ? "new-challenge" : "rejected-challenge",
+    onSessionError: () => { resets++; }, api: async (_, body) => {
+      tokens.push(body.turnstileToken);
+      if (tokens.length === 1) throw new Error("Verification rejected");
+      return session("verified-session");
+    } });
+  const rejected = await Promise.allSettled([getToken(), getToken()]);
+  assert.ok(rejected.every(result => result.status === "rejected"));
+  assert.equal(resets, 1); assert.equal(getToken.hasValidSession(), false);
+  assert.equal(await getToken(), "verified-session");
+  assert.deepEqual(tokens, ["rejected-challenge", "new-challenge"]);
 });
 test("expired sessions renew once for concurrent uploads and renew again after expiry", async () => {
   let calls = 0, time = start;
@@ -60,4 +96,15 @@ test("a restored failed upload renews a rejected session without duplicating its
     assert.deepEqual(bodies.map(body => body.sessionToken), ["old-token", "renewed-token"]);
     assert.equal(bodies[0].requestId, bodies[1].requestId); assert.deepEqual(renewals, [undefined, { rejectedToken: "old-token" }]);
   } finally { globalThis.fetch = originalFetch; }
+});
+test("a verification wait pauses guest photos without failing or discarding prepared files", async () => {
+  let calls = 0;
+  const prepared = { thumbnail: { bytes: 10 }, display: { bytes: 10 } };
+  const queue = new GalleryQueue({ api: () => { calls++; }, getSessionToken: async () => {
+    const error = new Error("Please complete verification"); error.code = "VERIFICATION_REQUIRED"; error.status = 403; throw error;
+  } });
+  queue.rows = [1, 2].map(id => ({ itemId: `photo-${id}`, phase: "queued", prepared }));
+  await queue.start();
+  assert.equal(queue.paused, true); assert.equal(queue.error, "Please complete verification"); assert.equal(calls, 0);
+  assert.ok(queue.rows.every(row => row.phase === "queued" && row.prepared === prepared && !row.error));
 });

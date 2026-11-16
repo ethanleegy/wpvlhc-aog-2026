@@ -120,6 +120,10 @@ export class GalleryQueue {
             row.compressedBytes = row.prepared.display.bytes + row.prepared.thumbnail.bytes;
           }
           const transfer = this.attemptTransfer(row).catch(error => {
+            if (!this.admin && error.code === "VERIFICATION_REQUIRED") {
+              row.phase = "queued"; row.error = null; this.paused = true; this.error = error.message;
+              return;
+            }
             row.phase = "failed"; row.error = error.message;
             if (error.status === 401 || error.status === 503 || ["STORAGE_LIMIT_REACHED", "PHOTO_LIMIT_REACHED", "SESSION_LIMIT_REACHED"].includes(error.code)) this.paused = true;
           }).finally(() => { active.delete(transfer); this.changed(); });

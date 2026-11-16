@@ -2,6 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./test",
+  // This fixture suite owns a separate guest server and is run from the root.
+  testIgnore: "gallery-verification.spec.js",
   fullyParallel: false,
   workers: 1,
   timeout: 45000,

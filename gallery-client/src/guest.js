@@ -6,16 +6,18 @@ const root = document.querySelector("#gallery-app");
 const local = ["localhost", "127.0.0.1"].includes(location.hostname);
 const base = root.dataset.apiBase || (local ? "http://127.0.0.1:5999/v1" : "https://wpvlhc-aog-2026.web.app/v1");
 const api = createGalleryApi({ base });
-let policy, queue, verification = "", widget;
-const session = createGuestSession({ api, getVerification: () => verification });
-async function getSessionToken(options) {
-  try { return await session(options); }
-  catch (error) {
-    verification = "";
-    if (widget !== undefined) window.turnstile?.reset(widget);
-    throw error;
+let policy, queue, verification = "", verificationExpiresAt = 0, widget, verificationScript;
+let verificationError = "", verificationTimer, verificationWatchdog, verifying = false, starting = false, startError = "";
+const verificationReady = () => !policy?.turnstileSiteKey || !!verification && Date.now() < verificationExpiresAt;
+const session = createGuestSession({ api, getVerification: () => {
+  if (!verificationReady()) {
+    const error = new Error("Please wait for photo-sharing verification, then try sharing again.");
+    error.code = "VERIFICATION_REQUIRED"; error.status = 403; throw error;
   }
-}
+  const token = verification;
+  clearVerification(); // Cloudflare challenges can only be redeemed once.
+  return token;
+}, onSessionError: () => resetVerification() });
 const make = (tag, text, className) => { const element = document.createElement(tag); if (text) element.textContent = text; if (className) element.className = className; return element; };
 root.append(make("p", "WPVLHC · ASSEMBLY OF GOD", "eyebrow"), make("h1", "Share the evening."), make("p", "A room full of memories. Add yours to the Christmas Gala.", "intro"));
 const controls = make("section", "", "share-card"), actions = make("div", "", "choose-actions");
@@ -30,9 +32,12 @@ const progress = make("p", "Opening photo sharing…", "status"); progress.role 
 const selected = make("ul", "", "selection");
 const notice = make("p", "Photos will appear publicly after upload. Management may hide them. Originals stay on your device.", "small");
 const challenge = make("div"), share = make("button", "Share photos"), retry = make("button", "Retry failed photos", "secondary"), pause = make("button", "Pause", "secondary");
+const verificationStatus = make("p", "", "small"), verifyAgain = make("button", "Retry verification", "secondary");
+verificationStatus.role = "status"; verificationStatus.setAttribute("aria-live", "polite"); verifyAgain.hidden = true;
+verifyAgain.onclick = () => resetVerification();
 share.disabled = true;
 const buttonRow = make("div", "", "choose-actions"); buttonRow.append(share, pause, retry);
-controls.append(actions, selected, notice, challenge, buttonRow, progress, make("p", "Keep this page open while sharing. If your connection drops, retry just the unfinished photos.", "small")); root.append(controls);
+controls.append(actions, selected, notice, challenge, verificationStatus, verifyAgain, buttonRow, progress, make("p", "Keep this page open while sharing. If your connection drops, retry just the unfinished photos.", "small")); root.append(controls);
 const gallery = make("section", "", "gallery-section"), heading = make("div", "", "gallery-heading"), refresh = make("button", "Refresh photos", "secondary");
 heading.append(make("h2", "From the evening"), refresh);
 const grid = make("div", "", "photo-grid"), more = make("button", "Load more photos", "secondary"); more.hidden = true;
@@ -73,6 +78,86 @@ async function load(reset = false) {
 refresh.onclick = () => load(true); more.onclick = () => load();
 const phases = { queued: "Ready to share", preparing: "Preparing on your device…", authorizing: "Preparing upload…", uploading: "Uploading…", publishing: "Adding to gallery…", retrying: "Connection interrupted — retrying…", published: "In the gallery", pending: "Uploaded — awaiting approval", failed: "Needs a retry", reselect: "Choose this source photo again to resume" };
 const previews = new Map();
+const needsSession = rows => rows.some(row => !row.upload && row.phase === "queued");
+const canAuthorize = rows => !needsSession(rows) || session.hasValidSession() || verificationReady();
+function updateControls() {
+  if (!queue) return;
+  const rows = queue.rows, retryRows = rows.map(row => row.phase === "failed" ? { ...row, phase: "queued" } : row);
+  share.disabled = starting || queue.running || queue.preparing || !rows.some(row => row.phase === "queued") || !policy?.guestUploadsOpen || !canAuthorize(rows);
+  share.textContent = starting ? "Opening photo sharing…" : queue.running ? "Sharing…" : "Share photos";
+  retry.disabled = starting || queue.running || queue.preparing || !policy?.guestUploadsOpen || !canAuthorize(retryRows);
+  retry.hidden = !rows.some(row => row.phase === "failed") || queue.running;
+  pause.hidden = !queue.running; pause.disabled = starting; pause.textContent = queue.paused ? "Resume" : "Pause";
+  const needsVerification = !!policy?.turnstileSiteKey && policy.guestUploadsOpen && !session.hasValidSession();
+  if (needsVerification && !session.isPending() && !verificationReady() && !verifying && !verificationError) resetVerification();
+  challenge.hidden = !needsVerification;
+  verificationStatus.hidden = !needsVerification;
+  verifyAgain.hidden = !needsVerification || !verificationError;
+  verifyAgain.disabled = starting;
+  verificationStatus.className = verificationError ? "small error" : "small";
+  verificationStatus.textContent = verificationError || (starting ? "Opening photo sharing…" : verificationReady() ? "Verification complete. Your photos are ready to share." : "Waiting for photo-sharing verification. Your selected photos will stay ready.");
+}
+function clearVerification() {
+  verification = ""; verificationExpiresAt = 0; clearTimeout(verificationTimer);
+}
+function verificationFailed(message) {
+  clearVerification(); clearTimeout(verificationWatchdog); verifying = false; verificationError = message; updateControls();
+}
+function watchVerification() {
+  clearTimeout(verificationWatchdog); verifying = true;
+  verificationWatchdog = setTimeout(() => verificationFailed("Verification is taking longer than expected. Check your connection, then retry verification."), 30_000);
+}
+function loadVerification() {
+  if (verificationScript || !policy?.turnstileSiteKey) return;
+  watchVerification();
+  const script = document.createElement("script"); verificationScript = script;
+  script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; script.async = true;
+  script.onload = () => renderVerification();
+  script.onerror = () => { script.remove(); verificationScript = undefined; verificationFailed("Photo-sharing verification could not load. Check your connection, then retry verification."); };
+  document.head.append(script);
+}
+function renderVerification() {
+  try {
+    widget = window.turnstile.render(challenge, { sitekey: policy.turnstileSiteKey, action: "gallery-upload", size: "flexible",
+      callback: token => {
+        clearTimeout(verificationWatchdog); clearTimeout(verificationTimer); verifying = false;
+        verification = token; verificationExpiresAt = Date.now() + 290_000; verificationError = ""; startError = "";
+        // Refresh before Cloudflare's five-minute expiry, including after a slow photo picker.
+        verificationTimer = setTimeout(() => { clearVerification(); if (!session.hasValidSession()) resetVerification(); else updateControls(); }, 290_000);
+        updateControls();
+        if (queue) render(queue.rows, queue);
+      },
+      "expired-callback": () => { clearVerification(); verificationError = ""; watchVerification(); updateControls(); },
+      "error-callback": code => { console.warn("Photo-sharing verification failed:", code); verificationFailed("Photo-sharing verification could not finish. Check your connection, then retry verification."); },
+      "timeout-callback": () => verificationFailed("Photo-sharing verification timed out. Please retry verification."),
+      "refresh-expired": "auto", "refresh-timeout": "auto",
+    });
+  } catch { verificationFailed("Photo-sharing verification could not start. Please refresh this page."); }
+}
+function resetVerification() {
+  clearVerification(); verificationError = "";
+  if (widget !== undefined) {
+    watchVerification();
+    try { window.turnstile.reset(widget); }
+    catch { verificationFailed("Photo-sharing verification could not restart. Please refresh this page."); }
+  } else if (window.turnstile) { watchVerification(); renderVerification(); }
+  else if (verificationScript) watchVerification();
+  else loadVerification();
+  updateControls();
+}
+async function startSharing(retryFailures = false) {
+  if (!queue || starting || queue.running && !queue.paused || queue.preparing || !policy?.guestUploadsOpen) return;
+  const rows = retryFailures ? queue.rows.map(row => row.phase === "failed" ? { ...row, phase: "queued" } : row) : queue.rows;
+  if (!canAuthorize(rows)) { updateControls(); return; }
+  starting = true; startError = ""; updateControls();
+  try {
+    // Open the shared session before changing any photo states. A verification
+    // rejection leaves the batch and its prepared previews available to retry.
+    if (needsSession(rows)) await session();
+  } catch (error) { startError = error.message; return; }
+  finally { starting = false; render(queue.rows, queue); }
+  return retryFailures ? queue.retryFailed() : queue.start();
+}
 function render(rows, state) {
   const done = rows.filter(row => ["published", "pending"].includes(row.phase)).length, failures = rows.filter(row => row.phase === "failed").length;
   selected.replaceChildren();
@@ -88,30 +173,22 @@ function render(rows, state) {
     if (row.photo) { grid.querySelector(".empty-gallery")?.remove(); appendPhoto(row.photo, true); }
   }
   for (const [id, url] of previews) if (!rows.some(row => row.itemId === id && row.prepared)) { URL.revokeObjectURL(url); previews.delete(id); }
-  share.disabled = state.running || state.preparing || !rows.some(row => row.phase === "queued") || !policy?.guestUploadsOpen;
-  share.textContent = state.running ? "Sharing…" : "Share photos";
-  pause.hidden = !state.running; pause.textContent = state.paused ? "Resume" : "Pause";
-  retry.hidden = !failures || state.running;
-  if (rows.length) progress.textContent = state.error || `${done} of ${rows.length} shared${failures ? ` · ${failures} need a retry` : ""}${state.storageWarning ? ` · ${state.storageWarning}` : ""}`;
+  updateControls();
+  if (rows.length) progress.textContent = startError || state.error || `${done} of ${rows.length} shared${failures ? ` · ${failures} need a retry` : ""}${state.storageWarning ? ` · ${state.storageWarning}` : ""}`;
 }
 for (const input of [camera, picker]) input.onchange = async () => {
   if (input.files.length > 20) { progress.textContent = "Choose up to 20 photos at a time."; input.value = ""; return; }
   if (queue) { queue.add([...input.files]); input.value = ""; await queue.preparePreviews(); }
 };
-share.onclick = () => queue.start();
-retry.onclick = () => queue.retryFailed(); pause.onclick = () => queue.paused ? queue.start() : queue.pause();
-window.addEventListener("beforeunload", event => { if (queue?.running) { event.preventDefault(); event.returnValue = ""; } });
+share.onclick = () => startSharing();
+retry.onclick = () => startSharing(true); pause.onclick = () => queue.paused ? startSharing() : queue.pause();
+window.addEventListener("beforeunload", event => { if (queue?.running || starting) { event.preventDefault(); event.returnValue = ""; } });
 try {
   policy = await api("/gallery/policy");
-  queue = new GalleryQueue({ api, getSessionToken, storageKey: `guest:${base}`, onChange: render }); await queue.restore();
+  queue = new GalleryQueue({ api, getSessionToken: session, storageKey: `guest:${base}`, onChange: render }); await queue.restore();
   if (policy.requireApproval) notice.textContent = "Photos will appear publicly after management approval. Originals stay on your device.";
   if (!policy.guestUploadsOpen) { cameraButton.disabled = true; chooseButton.disabled = true; progress.textContent = "Guest photo sharing is closed. You can still enjoy the gallery."; }
   else { cameraButton.disabled = false; chooseButton.disabled = false; progress.textContent = "Take a photo or choose a few favourites to get started."; }
-  if (policy.turnstileSiteKey) {
-    const script = document.createElement("script"); script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; script.async = true;
-    script.onload = () => { widget = window.turnstile.render(challenge, { sitekey: policy.turnstileSiteKey, action: "gallery-upload", callback: token => { verification = token; }, "expired-callback": () => { verification = ""; } }); };
-    script.onerror = () => { progress.textContent = "Photo-sharing verification could not load. Please check your connection and refresh."; };
-    document.head.append(script);
-  }
+  if (policy.guestUploadsOpen) loadVerification();
   await load(true);
 } catch (error) { progress.textContent = error.message; share.disabled = true; cameraButton.disabled = true; chooseButton.disabled = true; }
