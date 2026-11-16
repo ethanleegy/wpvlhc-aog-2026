@@ -5,11 +5,14 @@ const turnstileMock = `
 window.verificationTest = { resets: 0,
   success(token) { this.options.callback(token); },
   expire() { this.options['expired-callback'](); },
-  fail() { this.options['error-callback']('test-error'); },
-  timeout() { this.options['timeout-callback'](); }
+  fail(code = 'test-error') { this.options['error-callback'](code); },
+  timeout() { this.options['timeout-callback'](); },
+  interactive() { this.options['before-interactive-callback'](); },
+  finishedInteracting() { this.options['after-interactive-callback'](); },
+  unsupported() { this.options['unsupported-callback'](); }
 };
 window.turnstile = {
-  render(element, options) { window.verificationTest.options = options; element.textContent = 'Verifying…'; return 'test-widget'; },
+  render(element, options) { window.verificationTest.options = options; element.textContent = 'Verifying…'; element.style.minWidth = options.size === 'compact' ? '150px' : '300px'; return 'test-widget'; },
   reset() { window.verificationTest.resets++; }
 };`;
 
@@ -161,6 +164,58 @@ test("challenge errors and timeouts offer recovery without photo failures", asyn
   expect(calls.sessions).toEqual([]);
   await verify(page); await share(page).click();
   await expect(page.locator(".status")).toContainText("1 of 1 shared"); expect(errors).toEqual([]);
+});
+
+test("waiting for a person's checkbox does not trigger the automatic-check watchdog", async ({ page }) => {
+  await page.clock.install();
+  const { calls, errors } = await fixture(page);
+  await choose(page, 1); await page.evaluate(() => window.verificationTest.interactive());
+  await expect(page.getByRole("status").filter({ hasText: "complete the Cloudflare checkbox" })).toBeVisible();
+  await page.clock.fastForward(45_000);
+  await expect(page.getByRole("button", { name: "Retry verification", exact: true })).toBeHidden();
+  await expect(share(page)).toBeDisabled(); expect(calls.sessions).toEqual([]);
+  await page.evaluate(() => window.verificationTest.finishedInteracting());
+  await verify(page); await share(page).click();
+  await expect(page.locator(".status")).toContainText("1 of 1 shared"); expect(errors).toEqual([]);
+});
+
+test("a real challenge rejection exposes its reference and keeps photos ready", async ({ page }) => {
+  const { calls, errors } = await fixture(page);
+  await choose(page, 1); await page.evaluate(() => window.verificationTest.fail('600010'));
+  await expect(page.getByRole("status").filter({ hasText: "Cloudflare could not verify this browser" })).toContainText("Reference: 600010");
+  await expect(share(page)).toBeDisabled(); expect(calls.sessions).toEqual([]);
+  await expect(page.locator(".selection")).toContainText("Ready to share");
+  await page.getByRole("button", { name: "Retry verification", exact: true }).click();
+  await verify(page); await share(page).click();
+  await expect(page.locator(".status")).toContainText("1 of 1 shared"); expect(errors).toEqual([]);
+});
+
+test("hostname errors and unsupported browsers give actionable messages", async ({ page }) => {
+  const { calls, errors } = await fixture(page);
+  await page.evaluate(() => window.verificationTest.fail('110200'));
+  await expect(page.getByRole("status").filter({ hasText: "not enabled for this website" })).toContainText("Reference: 110200");
+  await page.getByRole("button", { name: "Retry verification", exact: true }).click();
+  await page.evaluate(() => window.verificationTest.unsupported());
+  await expect(page.getByRole("status").filter({ hasText: "up-to-date Chrome or Safari" })).toBeVisible();
+  expect(calls.sessions).toEqual([]); expect(errors).toEqual([]);
+});
+
+test("the verification widget fits a smaller phone without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const { errors } = await fixture(page);
+  expect(await page.evaluate(() => window.verificationTest.options.size)).toBe("compact");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("a hidden widget also fits a small phone when a saved session is rejected", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const { errors } = await fixture(page, { savedSession: true, rejectSavedSession: true });
+  await choose(page, 1); await share(page).click();
+  await expect(share(page)).toBeDisabled();
+  expect(await page.evaluate(() => window.verificationTest.options.size)).toBe("compact");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
 });
 
 test("a verification script load failure can retry without refreshing the page", async ({ page }) => {

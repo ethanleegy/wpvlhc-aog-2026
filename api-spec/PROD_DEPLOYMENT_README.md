@@ -90,6 +90,8 @@ In the intended Cloudflare account:
 5. Create a Turnstile Free widget for `wpvlhc-gala-2026.ivory-gy.com` after confirming that is the actual hostname. Record its public site key and private secret key. The client already sends action `gallery-upload`; Firebase verifies that action and the exact hostname. See [Turnstile setup](https://developers.cloudflare.com/turnstile/get-started/).
 6. Keep the Worker's `*/15 * * * *` maintenance trigger enabled. It calls a protected, bounded Firebase operation.
 
+Turnstile supplies **two different values**. Put the **Site Key** in `GALLERY_TURNSTILE_SITE_KEY` and the **Secret Key** in Firebase's `GALLERY_TURNSTILE_SECRET`. Copy both from the same widget. Saving the public Site Key in the private Secret Key field lets the browser show successful verification while the server rejects Share. Keep the private value out of source files and screenshots.
+
 The source bindings are in `cloudflare/gallery-worker/wrangler.jsonc`. If you choose different bucket names, update those bindings before generating the production configuration. Keep the committed development configuration separate from the generated production configuration.
 
 ## 4. Record the actual account review
@@ -350,6 +352,7 @@ Both platforms pause at the configured end. Do not assume renewals are automatic
 | `GALLERY_DISABLED` | Check the intended deployed function's gallery flag and secret bindings. |
 | `COST_REVIEW_REQUIRED` | Check both matching UTC periods and the Worker cutoff; complete a real account review before renewing. |
 | Turnstile failure | Check hostname, action and production key pair; used/expired challenge tokens need a fresh challenge. |
+| Turnstile succeeds but Share returns `VERIFICATION_REQUIRED` | Confirm the deployed `GALLERY_TURNSTILE_SECRET` contains the widget's **Secret Key**, not its public Site Key or another widget's secret. Set only that Firebase secret, then redeploy `functions:api`. Pushing GitHub Pages does not update the backend secret. |
 | Missing chunks / blank public page | Build the guest assets before Jekyll, publish every generated chunk, and confirm API/path settings. |
 | Thumbnail still unavailable | Automatic refresh is bounded to once per minute per photo. Use Refresh photos after resolving the underlying access/storage issue. |
 | Storage or operation limit | Pause, inspect usage/reservations and run bounded cleanup. Resume only when safe; do not raise limits or reset counters. |

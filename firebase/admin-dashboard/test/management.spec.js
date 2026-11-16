@@ -52,7 +52,7 @@ test("management creates an invitation, records food, exports reports and signs 
   );
   const url = await page.evaluate(() => navigator.clipboard.readText());
   const invitation = new URL(url);
-  expect(invitation.origin).toBe("http://localhost:3000");
+  expect(invitation.origin).toBe(process.env.MANAGEMENT_TEST_SITE_ORIGIN || "http://localhost:3000");
   const token = invitation.searchParams.get("token");
   expect(token).toMatch(/^[a-f0-9]{24}$/);
   const personal = await page.request.get(`/v1/token/${token}`);

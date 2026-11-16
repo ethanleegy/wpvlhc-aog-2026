@@ -7,7 +7,7 @@ const local = ["localhost", "127.0.0.1"].includes(location.hostname);
 const base = root.dataset.apiBase || (local ? "http://127.0.0.1:5999/v1" : "https://wpvlhc-aog-2026.web.app/v1");
 const api = createGalleryApi({ base });
 let policy, queue, verification = "", verificationExpiresAt = 0, widget, verificationScript;
-let verificationError = "", verificationTimer, verificationWatchdog, verifying = false, starting = false, startError = "";
+let verificationError = "", verificationTimer, verificationWatchdog, verifying = false, verificationInteractive = false, starting = false, startError = "";
 const verificationReady = () => !policy?.turnstileSiteKey || !!verification && Date.now() < verificationExpiresAt;
 const session = createGuestSession({ api, getVerification: () => {
   if (!verificationReady()) {
@@ -33,6 +33,7 @@ const selected = make("ul", "", "selection");
 const notice = make("p", "Photos will appear publicly after upload. Management may hide them. Originals stay on your device.", "small");
 const challenge = make("div"), share = make("button", "Share photos"), retry = make("button", "Retry failed photos", "secondary"), pause = make("button", "Pause", "secondary");
 const verificationStatus = make("p", "", "small"), verifyAgain = make("button", "Retry verification", "secondary");
+challenge.id = "photo-sharing-verification";
 verificationStatus.role = "status"; verificationStatus.setAttribute("aria-live", "polite"); verifyAgain.hidden = true;
 verifyAgain.onclick = () => resetVerification();
 share.disabled = true;
@@ -95,16 +96,16 @@ function updateControls() {
   verifyAgain.hidden = !needsVerification || !verificationError;
   verifyAgain.disabled = starting;
   verificationStatus.className = verificationError ? "small error" : "small";
-  verificationStatus.textContent = verificationError || (starting ? "Opening photo sharing…" : verificationReady() ? "Verification complete. Your photos are ready to share." : "Waiting for photo-sharing verification. Your selected photos will stay ready.");
+  verificationStatus.textContent = verificationError || (starting ? "Opening photo sharing…" : verificationReady() ? "Verification complete. Your photos are ready to share." : verificationInteractive ? "Please complete the Cloudflare checkbox above. Your selected photos will stay ready." : "Waiting for photo-sharing verification. Your selected photos will stay ready.");
 }
 function clearVerification() {
   verification = ""; verificationExpiresAt = 0; clearTimeout(verificationTimer);
 }
 function verificationFailed(message) {
-  clearVerification(); clearTimeout(verificationWatchdog); verifying = false; verificationError = message; updateControls();
+  clearVerification(); clearTimeout(verificationWatchdog); verifying = false; verificationInteractive = false; verificationError = message; updateControls();
 }
 function watchVerification() {
-  clearTimeout(verificationWatchdog); verifying = true;
+  clearTimeout(verificationWatchdog); verifying = true; verificationInteractive = false;
   verificationWatchdog = setTimeout(() => verificationFailed("Verification is taking longer than expected. Check your connection, then retry verification."), 30_000);
 }
 function loadVerification() {
@@ -118,21 +119,44 @@ function loadVerification() {
 }
 function renderVerification() {
   try {
-    widget = window.turnstile.render(challenge, { sitekey: policy.turnstileSiteKey, action: "gallery-upload", size: "flexible",
+    // A flexible widget still has a 300px minimum; smaller phones need compact.
+    const padding = getComputedStyle(controls);
+    const width = challenge.clientWidth || controls.clientWidth - parseFloat(padding.paddingLeft) - parseFloat(padding.paddingRight);
+    const size = width < 300 ? "compact" : "flexible";
+    widget = window.turnstile.render(challenge, { sitekey: policy.turnstileSiteKey, action: "gallery-upload", size,
       callback: token => {
-        clearTimeout(verificationWatchdog); clearTimeout(verificationTimer); verifying = false;
+        clearTimeout(verificationWatchdog); clearTimeout(verificationTimer); verifying = false; verificationInteractive = false;
         verification = token; verificationExpiresAt = Date.now() + 290_000; verificationError = ""; startError = "";
         // Refresh before Cloudflare's five-minute expiry, including after a slow photo picker.
         verificationTimer = setTimeout(() => { clearVerification(); if (!session.hasValidSession()) resetVerification(); else updateControls(); }, 290_000);
         updateControls();
         if (queue) render(queue.rows, queue);
       },
+      "before-interactive-callback": () => {
+        // Waiting for a person is not a stalled automatic check. Keep the
+        // checkbox available rather than encouraging them to reset it.
+        clearTimeout(verificationWatchdog); verifying = true; verificationInteractive = true; verificationError = ""; updateControls();
+      },
+      "after-interactive-callback": () => {
+        verificationInteractive = false;
+        if (!verificationReady() && !verificationError) watchVerification();
+        updateControls();
+      },
       "expired-callback": () => { clearVerification(); verificationError = ""; watchVerification(); updateControls(); },
-      "error-callback": code => { console.warn("Photo-sharing verification failed:", code); verificationFailed("Photo-sharing verification could not finish. Check your connection, then retry verification."); },
+      "error-callback": code => {
+        const reference = /^\d{3,6}$/.test(String(code)) ? String(code) : "unknown";
+        console.warn("Photo-sharing verification failed:", reference);
+        let message = "Photo-sharing verification could not finish. Check your connection, then retry verification.";
+        if (reference === "110200") message = "Photo verification is not enabled for this website. Please contact the event team.";
+        else if (["110100", "110110", "400020", "400021", "400070"].includes(reference)) message = "Photo verification is unavailable. Please contact the event team.";
+        else if (/^(300|600)/.test(reference)) message = "Cloudflare could not verify this browser. Try a private tab or switch between Wi-Fi and mobile data, then retry verification.";
+        verificationFailed(`${message} Reference: ${reference}.`);
+      },
       "timeout-callback": () => verificationFailed("Photo-sharing verification timed out. Please retry verification."),
+      "unsupported-callback": () => verificationFailed("This browser cannot complete photo verification. Please open this link in an up-to-date Chrome or Safari browser."),
       "refresh-expired": "auto", "refresh-timeout": "auto",
     });
-  } catch { verificationFailed("Photo-sharing verification could not start. Please refresh this page."); }
+  } catch (error) { console.warn("Photo-sharing verification could not start:", error.message); verificationFailed("Photo-sharing verification could not start. Please refresh this page."); }
 }
 function resetVerification() {
   clearVerification(); verificationError = "";
