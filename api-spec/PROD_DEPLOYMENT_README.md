@@ -361,7 +361,9 @@ Both platforms pause at the configured end. Do not assume renewals are automatic
 
 For rollback, first close guest/admin uploads. Disable the gallery flag and redeploy Firebase if needed; an expired Worker cost review stops image access as well. Restore a known-good compatible release while preserving metadata, buckets and secrets. Secret rotation must update both matching platforms together.
 
-Retained-photo export/deletion is not an admin feature in this version. Agree an export, verification and retention date before any deletion. Keep originals outside the gallery. Updating the gallery does not require reseeding or deleting invitation data.
+Permanent single/bulk photo deletion is available in the admin gallery with a required typed `delete` confirmation. It removes photo metadata immediately and durably deletes staging, retained and published variants; reserved bytes and event photo counts are released only after cleanup succeeds. Unfinished transfers and storage outages stay queued for maintenance. The admin storage summary shows pending deletion cleanup, and Retry pending operations can retry it. Already issued image links/browser caches may last up to five minutes. Guest-session lifetime limits remain unchanged. Minimal private `PhotoDeletions` tombstones prevent old upload retries from restoring deleted IDs. Do not remove those tombstones or manually lower counters.
+
+For this feature, deploy the reviewed Worker **before** `functions:api`, then build and deploy admin Hosting. It uses a bounded internal `delete-many` command; no new composite indexes or data migration are required. A GitHub Pages push alone does not release admin gallery deletion. Retained-photo export is still unavailable; keep originals outside the gallery and agree any retention/export requirements before deleting photos. No production photos are automatically deleted by deploying this feature.
 
 ## Release checklist
 

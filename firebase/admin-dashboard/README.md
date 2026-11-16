@@ -27,6 +27,14 @@ Open `http://127.0.0.1:5173`. Vite proxies `/v1` to `http://127.0.0.1:5001/demo-
 
 Report times use `America/Guyana`. Data loads on sign-in, saving and Refresh; there is no live subscription. People loading follows all cursor pages for World Prayer Vision. Expired sessions return to sign-in and clear the management view.
 
+## Delete gallery photos
+
+In **Photo gallery**, use **Delete photo** on a card, or select photos and choose **Delete selected**. This works for guest/admin photos and old authorized, expired or failed records. The dialog lists the chosen filenames, warns that removal is permanent and requires the exact lowercase word **delete**. Only loaded, selected photos are affected; load more cards before selecting a larger collection. Hide/show remains the reversible option.
+
+Accepted deletions disappear from the gallery immediately. The backend removes their staging, retained and published image variants, then releases reserved storage and event photo counts exactly once. Unfinished transfers or storage outages leave durable cleanup pending; the storage summary shows that count. The existing maintenance task or **Retry pending operations** finishes cleanup. Busy photos stay selected in the confirmation for retry. Bulk requests contain at most 25 IDs; successful groups remain removed if a later response is lost, and retry continues safely. The browser's guest-session lifetime upload cap is not reset by deleting a photo.
+
+Previously issued viewing links and browser caches may last up to five minutes. Originals on uploaders' devices are unaffected. No deletion is performed until the administrator confirms it. To release this feature, deploy the reviewed **Worker first**, then **functions:api**, then build/deploy admin **Hosting**. The Worker adds the bounded internal deletion command; the public Jekyll site does not need changes. No database reseeding or new composite indexes are required.
+
 ## Delete people
 
 Use **Delete** on a person, or check rows/**Select all shown people** and choose **Delete selected**. Select all follows the current search and reply filter, including all loaded cursor pages. Changing tabs/search/reply clears selection, so hidden people are not deleted accidentally. Each confirmation lists the chosen names and companions, displays a prominent warning, and requires typing the exact lowercase word **delete**; the server enforces it too.

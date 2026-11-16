@@ -132,3 +132,36 @@ test("admin refreshes expired thumbnails and bounds retries when storage stays u
   await page.getByRole("img", { name: "d-expiry.jpg", exact: true }).evaluate(image => image.dispatchEvent(new Event("error")));
   expect(refreshes.get(ids[0])).toBe(1); expect(refreshes.get(ids[1])).toBe(1);
 });
+
+test("admin permanently deletes an uploaded photo, its private/public copies and its capacity reservation", async ({ page, request }) => {
+  await page.goto("http://127.0.0.1:5173/");
+  await page.getByLabel("Username", { exact: true }).fill("localadmin"); await page.getByLabel("Password", { exact: true }).fill("local-gallery-only");
+  await page.getByRole("button", { name: "Sign in →" }).click();
+  await page.getByRole("button", { name: "Photo gallery", exact: false }).click();
+  await expect(page.getByRole("heading", { name: "Share the evening", exact: true })).toBeVisible();
+  const before = (await (await page.request.get("http://127.0.0.1:5173/v1/admin/gallery/settings")).json()).capacity;
+  const name = `delete-check-${Date.now()}.png`;
+  await page.getByLabel("Publish this batch", { exact: true }).selectOption("publish");
+  await page.getByLabel("Choose admin photos", { exact: true }).setInputFiles({ name, mimeType: "image/png", buffer: tinyPng });
+  const authorized = page.waitForResponse(response => response.url().endsWith("/v1/admin/gallery/uploads") && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Start sharing", exact: true }).click();
+  const authorization = await authorized, photoId = (await authorization.json()).uploads[0].photoId;
+  const original = authorization.request().postDataJSON();
+  await expect(page.locator(".gallery-upload [role=status]")).toContainText("1 of 1 shared", { timeout: 45_000 });
+  const publicPhoto = await (await request.get(`${apiBase}/gallery/photos/${photoId}`)).json();
+  const privatePhoto = await (await page.request.get(`http://127.0.0.1:5173/v1/admin/gallery/photos/${photoId}`)).json();
+  expect((await request.get(publicPhoto.thumbnailUrl)).status()).toBe(200);
+  expect((await request.get(privatePhoto.displayUrl)).status()).toBe(200);
+  await page.getByRole("button", { name: `Delete ${name}`, exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete photo?", exact: true });
+  await dialog.getByLabel("Type delete to confirm").fill("delete"); await dialog.getByRole("button", { name: "Delete photo", exact: true }).click();
+  await expect(dialog).toHaveCount(0); await expect(page.getByRole("status")).toContainText("1 photo removed");
+  await expect(page.getByLabel("Publish this batch", { exact: true })).toBeEnabled();
+  expect((await request.get(`${apiBase}/gallery/photos/${photoId}`)).status()).toBe(404);
+  expect((await request.get(publicPhoto.thumbnailUrl)).status()).toBe(404);
+  expect((await request.get(privatePhoto.displayUrl)).status()).toBe(404);
+  const after = (await (await page.request.get("http://127.0.0.1:5173/v1/admin/gallery/settings")).json()).capacity;
+  expect(after).toEqual(before);
+  const replay = await page.request.post("http://127.0.0.1:5173/v1/admin/gallery/uploads", { headers: { "X-Admin-Request": "true" }, data: original });
+  expect(replay.status()).toBe(410); expect((await replay.json()).error.code).toBe("PHOTO_DELETED");
+});

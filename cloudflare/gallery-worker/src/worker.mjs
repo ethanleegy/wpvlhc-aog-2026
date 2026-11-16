@@ -25,6 +25,23 @@ async function internalStorage(request, env) {
   const text = await request.text();
   if (text.length > 4096) return fail(413, "TOO_LARGE", "Command too large");
   const command = JSON.parse(text);
+  if (command.action === "delete-many") {
+    if (!Array.isArray(command.objects) || !command.objects.length || command.objects.length > 16) return fail(400, "INVALID_COMMAND", "Provide up to 16 photo objects");
+    let objects;
+    try { objects = command.objects.map(ref => ({ ...objectRef(env, ref), bucket: ref.bucket })); }
+    catch { return fail(400, "INVALID_COMMAND", "Invalid photo object scope"); }
+    await Promise.all(["private", "published"].map(async name => {
+      const keys = objects.filter(object => object.bucket === name).map(object => object.key);
+      if (keys.length) await bucket(env, name).delete(keys);
+    }));
+    // Best-effort eviction in this data centre. Previously issued/browser-cached
+    // image links remain bounded by their existing five-minute expiry.
+    await Promise.allSettled(objects.filter(object => object.bucket === "published").map(object => {
+      const [, , id, generation, variant] = object.key.split("/");
+      return caches.default.delete(new Request(`${new URL(request.url).origin}/images/public/${id}/${generation}/${variant}`));
+    }));
+    return json({ deleted: true });
+  }
   const source = objectRef(env, command.source);
   if (command.action === "delete") {
     await source.binding.delete(source.key);

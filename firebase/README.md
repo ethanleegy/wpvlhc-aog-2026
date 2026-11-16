@@ -99,6 +99,7 @@ Credentials, PUBLIC_SITE_URL and ALLOWED_ORIGINS are required. In production, `P
 | `FoodContributions` | Same code as the person | `guestId`, `items: [{foodItemId, name, unit, quantity, notes}]`, `updatedAt` |
 | `PublicRegistrationRequests` | SHA-256 of event and canonical private UUIDv4 request ID | Input fingerprint, original registration receipt (including guest code), `createdAt`; after permanent person deletion only `fingerprint` and `deletedAt` remain, preventing old retries from restoring or revealing deleted records |
 | `FoodImportRequests` | SHA-256 of event and private UUIDv4 batch ID | Food-input fingerprint, original imported slot IDs/count, `createdAt`; server-only retry receipts |
+| `PhotoDeletions` | Gallery photo ID | Server-only pending file-cleanup manifests and leases; after cleanup only a minimal deletion tombstone/audit remains. Prevents original upload retries from restoring photos or releasing capacity twice. |
 | `RateLimits` | SHA-256 digest of a limit key | `count`, `expiresAt` (TTL field) |
 | `SeedData` | Legacy `gala-2026-members` | Historical sample-seed state, if present; the food-only seed does not read or write it |
 

@@ -3,6 +3,7 @@ const { ApiError, requireRecord } = require("./errors");
 const { assertGallery } = require("./gallery-config");
 const { createGalleryStorage } = require("./gallery-storage");
 const { verifyImage } = require("./gallery-image");
+const { createGalleryDeletion, deletedError } = require("./gallery-deletion");
 const { EVENT, LIMITS, VARIANTS, signCapability, verifyCapability } = require("./gallery-contract.mjs");
 
 const hash = text => createHash("sha256").update(text).digest("hex");
@@ -21,7 +22,7 @@ function createGalleryService(db, fullConfig, storageFactory = createGalleryStor
   const sessions = db.collection("GallerySessions");
   const batches = db.collection("GalleryUploadBatches");
   const requests = db.collection("GalleryUploadRequests");
-  const capacityDefaults = { reservedBytes: 0, photoCount: 0, guestCount: 0, adminCount: 0 };
+  const capacityDefaults = { reservedBytes: 0, photoCount: 0, guestCount: 0, adminCount: 0, pendingDeletionCount: 0 };
 
   async function reserveOps(writes, reads) {
     assertGallery(config);
@@ -33,6 +34,7 @@ function createGalleryService(db, fullConfig, storageFactory = createGalleryStor
     });
   }
   const storage = storageFactory(config, reserveOps);
+  const deletion = createGalleryDeletion(db, storage);
   async function settings() { return { ...defaults, ...(await settingsRef.get()).data() }; }
   async function policy() {
     const current = await settings();
@@ -136,6 +138,7 @@ function createGalleryService(db, fullConfig, storageFactory = createGalleryStor
   const retainedRef = (id, variant) => ref("private", `retained/${EVENT}/${id}/initial/${variant}`);
   const publishedRef = (id, generation, variant) => ref("published", `published/${EVENT}/${id}/${generation}/${variant}`);
   async function uploadDetails(id, photo) {
+    if (!photo) throw deletedError();
     const exp = Math.floor(photo.attemptExpiresAt / 1000);
     const variants = {};
     for (const variant of VARIANTS) {
@@ -149,7 +152,9 @@ function createGalleryService(db, fullConfig, storageFactory = createGalleryStor
     return { photoId: id, variants, completionToken, expiresAt: new Date(photo.attemptExpiresAt).toISOString(), uploadState: photo.uploadState };
   }
   async function checkAccess(id, token, admin) {
-    const photo = requireRecord(await photos.doc(id).get(), "Photo");
+    const doc = await photos.doc(id).get();
+    if (!doc.exists && await deletion.wasDeleted(id)) throw deletedError();
+    const photo = requireRecord(doc, "Photo");
     if (!admin) {
       let capability;
       try { capability = await verifyCapability(config.ticketSecret, token, "complete"); }
@@ -162,7 +167,7 @@ function createGalleryService(db, fullConfig, storageFactory = createGalleryStor
     await checkAccess(id, token, admin);
     await db.runTransaction(async tx => {
       const [doc, capDoc] = await Promise.all([tx.get(photos.doc(id)), tx.get(capacityRef)]);
-      const photo = doc.data(), capacity = capDoc.data();
+      const photo = requireRecord(doc, "Photo"), capacity = capDoc.data();
       if (photo.uploadState === "ready") return;
       if (["failed", "expired"].includes(photo.uploadState)) throw new ApiError(409, "UPLOAD_CLOSED", "Select this photo again to make a new submission");
       if (photo.lease?.expiresAt > Date.now()) throw new ApiError(409, "PHOTO_BUSY", "The photo is still being checked. Please retry shortly.");
@@ -203,7 +208,9 @@ function createGalleryService(db, fullConfig, storageFactory = createGalleryStor
     try { capability = await verifyCapability(config.ticketSecret, ticket, "upload", 0); }
     catch { throw new ApiError(403, "INVALID_TICKET", "Invalid upload permission"); }
     await db.runTransaction(async tx => {
-      const doc = await tx.get(photos.doc(capability.photoId)), photo = requireRecord(doc, "Photo");
+      const doc = await tx.get(photos.doc(capability.photoId));
+      if (!doc.exists) return deletion.recordReceipt(tx, capability, outcome);
+      const photo = doc.data();
       const attempt = photo.attempts.find(a => a.id === capability.attempt);
       if (!attempt?.claimed?.[capability.variant]) throw new ApiError(409, "UNCLAIMED_UPLOAD", "Upload attempt was not claimed");
       tx.update(doc.ref, { attempts: photo.attempts.map(a => a.id === capability.attempt ? { ...a, settled: { ...a.settled, [capability.variant]: outcome } } : a) });
@@ -213,7 +220,9 @@ function createGalleryService(db, fullConfig, storageFactory = createGalleryStor
   async function lease(id) {
     const owner = randomUUID();
     const acquired = await db.runTransaction(async tx => {
-      const photo = requireRecord(await tx.get(photos.doc(id)), "Photo");
+      const doc = await tx.get(photos.doc(id));
+      if (!doc.exists) return false;
+      const photo = doc.data();
       if (photo.lease?.expiresAt > Date.now()) return false;
       tx.update(photos.doc(id), { lease: { owner, expiresAt: Date.now() + 120_000 } });
       return true;
@@ -361,7 +370,8 @@ function createGalleryService(db, fullConfig, storageFactory = createGalleryStor
     return { photos: await Promise.all(snapshot.docs.slice(0, query.limit).map(doc => admin ? adminPhoto(doc.id, doc.data()) : publicPhoto(doc.id, doc.data()))), nextCursor: snapshot.size > query.limit ? snapshot.docs[query.limit - 1].id : null };
   }
   async function maintenance(limit = 10) {
-    const result = { cleaned: 0, repaired: 0, failed: 0 };
+    const removed = await deletion.maintenance(limit);
+    const result = { cleaned: 0, repaired: 0, failed: removed.failed, deleted: removed.deleted };
     const due = await photos.where("nextCleanupAt", "<=", Date.now()).orderBy("nextCleanupAt").limit(limit).get();
     for (const doc of due.docs) {
       const owner = await lease(doc.id);
@@ -402,6 +412,6 @@ function createGalleryService(db, fullConfig, storageFactory = createGalleryStor
     if (!safeEqual(secret, config.claimSecret)) throw new ApiError(403, "FORBIDDEN", "Access denied");
     return maintenance(limit);
   }
-  return { policy, settings: adminSettings, patchSettings, createSession, createBatch, authorize, complete, retry, status, claim, receipt, moderate, list, detail, reserveOps, maintenance, internalMaintenance };
+  return { policy, settings: adminSettings, patchSettings, createSession, createBatch, authorize, complete, retry, status, claim, receipt, moderate, list, detail, reserveOps, maintenance, internalMaintenance, deletePhotos: deletion.remove };
 }
 module.exports = { createGalleryService, safeEqual };

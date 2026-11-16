@@ -329,7 +329,7 @@ Use the setup in [firebase/README.md](../firebase/README.md). Seed the church/me
 
 ## Photo gallery integration
 
-The gallery is implemented locally and remains disabled on production until configured and deployed. Its complete Firebase route contract is in `openapi.json`; browser binaries are uploaded to the separate Cloudflare Worker, never as base64/JSON through Firebase.
+Gallery deployment is opt-in and requires the configured Firebase API, Cloudflare Worker and browser builds. Its complete Firebase route contract is in `openapi.json`; browser binaries are uploaded to the separate Cloudflare Worker, never as base64/JSON through Firebase.
 
 Guest flow: scan the shared page QR → take/choose → preview → Share photos. Use `GET /gallery/policy` for compression limits and Turnstile configuration. Create a verified session with `POST /gallery/sessions`, then authorize compressed variants with `POST /gallery/uploads`. Send each JPEG/WebP Blob with PUT to its returned URL and the exact `Content-Type` and `X-Gallery-Ticket`. Call completion and use the authoritative state: `ready + approved + published` means visible. Automatic publication is the default; prior approval yields a private pending photo.
 
@@ -338,5 +338,15 @@ Reuse the shared queue/compressor in `gallery-client/src/`. Both guest and admin
 `GET /gallery/photos?limit=20&after=...` returns only published photos with IDs, thumbnail/display URLs, dimensions and publication dates. Treat `nextCursor` as opaque. Viewing links expire within five minutes; GET /gallery/photos/{photoId} refreshes links for one currently published photo without resetting the viewer's position. Hidden photos return 404. The matching admin detail endpoint refreshes private previews. Never place the completion capability, uploader data or private preview URLs in a public feed. The supplied guest page updates its own newly published photos without reloading.
 
 Management uses the existing same-origin session and mutation header. Settings control prior approval and separate guest/admin upload switches. Admin uploads belong to idempotent batches with `follow`, `publish` or `review` publication choices. `/admin/gallery/photos` supports visible/hidden/pending/failed filters, batch filtering and pagination. `/admin/gallery/actions` accepts at most 25 explicit photo IDs with action `show` or `hide`, returning per-item results. Hiding removes a photo from fresh feeds immediately; existing image links/caches can remain usable for up to five minutes. The current implementation relies on expiry rather than instant global purging. Unapproving never deletes the private retained variants.
+
+### Permanent gallery photo deletion (API 1.6.0)
+
+- `DELETE /admin/gallery/photos/{photoId}` accepts JSON `{ "confirmation": "delete" }`.
+- `POST /admin/gallery/photos/bulk-delete` accepts `{ "confirmation": "delete", "photoIds": ["<32-character lowercase hex ID>"] }`, with 1–25 unique IDs.
+- Both require the existing admin cookie, JSON content type and `X-Admin-Request: true`. The exact lowercase confirmation is required server-side; missing confirmation returns `409 PHOTO_DELETE_CONFIRMATION_REQUIRED`.
+- Success returns `{results:[{id,success,pending?,missing?,error?}]}`. Handle each result: busy photos return `success:false` with `PHOTO_BUSY`; accepted removals have `success:true`, and `pending:true` means physical file cleanup is queued. Metadata disappears from all gallery views immediately. Missing IDs and lost-response retries are safe.
+- The server deletes every tracked staging/retained/published variant, then releases bytes and event/source photo counts once. A claimed upload with an uncertain outcome keeps its reservation until a stored receipt or ticket expiry plus a two-minute grace makes cleanup safe. Scheduled maintenance and the admin Retry pending operations action resume queued cleanup. Admin settings include `capacity.pendingDeletionCount`; maintenance responses include `deleted`.
+- The original upload authorization/completion/retry cannot restore a removed photo: it returns `410 PHOTO_DELETED`. Minimal server-only `PhotoDeletions` tombstones persist; guest-session lifetime upload limits are unchanged. Fresh public/admin detail requests return 404. Previously issued photo links or browser caches can last up to five minutes.
+- Deploy the reviewed Worker first (it adds bounded internal `delete-many` storage), then `functions:api`, then admin Hosting. No public Jekyll changes, composite indexes, reseeding or data migration are required.
 
 All `/internal/gallery/*` routes are Worker-only and require a separate bearer secret; do not call them from browser code. Cloudflare requests and R2 usage are bounded for the $0 target, so uploads or viewing can pause at a limit or expired account review. Show a useful retry/availability state rather than silently bypassing the gateway. The local guide explains how to exercise the full flow without production resources.

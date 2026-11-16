@@ -53,6 +53,23 @@ test("cached delivery still checks capability expiry and private scope", async (
   const privateTicket = await signCapability(secret, { ...payload, bucket: "private", key: `retained/gala-2026/${id}/initial/thumbnail` });
   assert.equal((await mf.dispatchFetch(`https://worker.example${path}?v=${privateTicket}`)).status, 403);
 });
+test("bounded internal deletion removes both bucket scopes without accepting invalid manifests", async () => {
+  const id = "d".repeat(32);
+  const objects = [
+    { bucket: "private", key: `staging/gala-2026/${id}/initial/thumbnail` },
+    { bucket: "private", key: `retained/gala-2026/${id}/initial/display` },
+    { bucket: "published", key: `published/gala-2026/${id}/0/thumbnail` },
+  ];
+  for (const object of objects) await (await mf.getR2Bucket(object.bucket === "private" ? "PRIVATE" : "PUBLISHED")).put(object.key, "delete-test");
+  const send = (objects, authorized = true) => mf.dispatchFetch("https://worker.example/internal/storage", { method: "POST", headers: { "Content-Type": "application/json", Authorization: authorized ? `Bearer ${internal}` : "Bearer invalid" }, body: JSON.stringify({ action: "delete-many", objects }) });
+  assert.equal((await send(objects, false)).status, 403);
+  assert.equal((await send([...objects, { bucket: "published", key: "unrelated/file" }])).status, 400);
+  assert.equal((await send(Array.from({ length: 17 }, () => objects[0]))).status, 400);
+  assert.ok(await (await mf.getR2Bucket("PRIVATE")).get(objects[0].key));
+  assert.equal((await send(objects)).status, 200);
+  for (const object of objects) assert.equal(await (await mf.getR2Bucket(object.bucket === "private" ? "PRIVATE" : "PUBLISHED")).get(object.key), null);
+  assert.equal((await send(objects)).status, 200);
+});
 test("expired cost review blocks image delivery and writes", async () => {
   await mf.setOptions(convertV4MiniflareOptions({ ...options, bindings: { ...bindings, COST_APPROVAL_EXPIRES_AT: "2020-01-01T00:00:00Z" } }));
   const response = await mf.dispatchFetch("https://worker.example/upload", { method: "PUT", body: "test" });

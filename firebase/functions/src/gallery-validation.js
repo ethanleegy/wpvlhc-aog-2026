@@ -26,6 +26,8 @@ const schemas = {
   list: Joi.object({ limit: Joi.number().integer().min(1).max(100).default(20), after: hexId, status: Joi.string().valid("visible", "hidden", "pending", "failed", "all").default("all"), batchId: hexId }),
   publicList: Joi.object({ limit: Joi.number().integer().min(1).max(50).default(20), after: hexId }),
   actions: Joi.object({ action: Joi.string().valid("show", "hide").required(), photoIds: Joi.array().items(hexId).min(1).max(25).unique().required() }),
+  deletePhoto: Joi.object({ confirmation: Joi.string().valid("delete") }),
+  deletePhotos: Joi.object({ confirmation: Joi.string().valid("delete"), photoIds: Joi.array().items(hexId).min(1).max(25).unique().required() }),
   maintenance: Joi.object({ limit: Joi.number().integer().min(1).max(25).default(10) }),
 };
 module.exports = { gallerySchemas: schemas };

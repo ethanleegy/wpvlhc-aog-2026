@@ -30,6 +30,8 @@ function galleryRoutes(api, admin, { getDb, storageFactory }) {
   admin.post("/gallery/uploads/:photoId/retry", input(s.photo, "params"), input(require("./validation").schemas.empty), async (req, res) => res.json(await service(res).retry(res.locals.params.photoId, null, true)));
   admin.get("/gallery/photos", input(s.list, "query"), async (req, res) => res.json(await service(res).list(res.locals.query, true)));
   admin.get("/gallery/photos/:photoId", input(s.photo, "params"), async (req, res) => res.json(await service(res).detail(res.locals.params.photoId, true)));
+  admin.delete("/gallery/photos/:photoId", input(s.photo, "params"), input(s.deletePhoto), async (req, res) => res.json(await service(res).deletePhotos([res.locals.params.photoId], res.locals.body.confirmation, res.locals.admin.username)));
+  admin.post("/gallery/photos/bulk-delete", input(s.deletePhotos), async (req, res) => res.json(await service(res).deletePhotos(res.locals.body.photoIds, res.locals.body.confirmation, res.locals.admin.username)));
   admin.post("/gallery/actions", input(s.actions), async (req, res) => res.json(await service(res).moderate(res.locals.body.photoIds, res.locals.body.action, res.locals.admin.username)));
   admin.post("/gallery/maintenance", input(s.maintenance), async (req, res) => res.json(await service(res).maintenance(res.locals.body.limit)));
 }

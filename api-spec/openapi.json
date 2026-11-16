@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "WPVLHC AOG Christmas Social API",
-    "version": "1.5.1",
+    "version": "1.6.0",
     "description": "Node.js 24 + Express 5 + Joi + Firestore. Public shared-link registration, invitation flows and authenticated church administration. All timestamps are UTC ISO 8601 strings. All non-health responses use Cache-Control: private, no-store. No direct client Firestore access."
   },
   "servers": [
@@ -155,8 +155,8 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "New registration saved atomically.",
+          "200": {
+            "description": "Identical successful request replayed; original receipt, no new registration or slot updates.",
             "content": {
               "application/json": {
                 "schema": {
@@ -165,8 +165,8 @@
               }
             }
           },
-          "200": {
-            "description": "Identical successful request replayed; original receipt, no new registration or slot updates.",
+          "201": {
+            "description": "New registration saved atomically.",
             "content": {
               "application/json": {
                 "schema": {
@@ -207,6 +207,16 @@
           },
           "409": {
             "description": "FOOD_ITEM_TAKEN, FOOD_ITEM_INACTIVE or REQUEST_CHANGED; no partial guest/contribution created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "REGISTRATION_DELETED: management permanently deleted this registration. An identical old request ID cannot retrieve the previous receipt or recreate the person. A deliberate new registration needs a new request ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -266,16 +276,6 @@
           },
           "503": {
             "description": "REGISTRATION_UNAVAILABLE: the server-assigned church is missing or inactive.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "410": {
-            "description": "REGISTRATION_DELETED: management permanently deleted this registration. An identical old request ID cannot retrieve the previous receipt or recreate the person. A deliberate new registration needs a new request ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3400,6 +3400,16 @@
               }
             }
           },
+          "410": {
+            "description": "PHOTO_DELETED: management permanently removed this photo; the original upload cannot be resumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "413": {
             "description": "JSON request exceeds 32 KB",
             "content": {
@@ -3559,6 +3569,16 @@
           },
           "409": {
             "description": "Upload incomplete, attempt consumed, busy photo or capacity reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "PHOTO_DELETED: management permanently removed this photo; the original upload cannot be resumed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3731,6 +3751,16 @@
               }
             }
           },
+          "410": {
+            "description": "PHOTO_DELETED: management permanently removed this photo; the original upload cannot be resumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "413": {
             "description": "JSON request exceeds 32 KB",
             "content": {
@@ -3887,6 +3917,16 @@
           },
           "409": {
             "description": "Upload incomplete, attempt consumed, busy photo or capacity reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "PHOTO_DELETED: management permanently removed this photo; the original upload cannot be resumed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5055,6 +5095,16 @@
               }
             }
           },
+          "410": {
+            "description": "PHOTO_DELETED: management permanently removed this photo; the original upload cannot be resumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "413": {
             "description": "JSON request exceeds 32 KB",
             "content": {
@@ -5238,6 +5288,16 @@
               }
             }
           },
+          "410": {
+            "description": "PHOTO_DELETED: management permanently removed this photo; the original upload cannot be resumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "413": {
             "description": "JSON request exceeds 32 KB",
             "content": {
@@ -5400,6 +5460,16 @@
           },
           "409": {
             "description": "Upload incomplete, attempt consumed, busy photo or capacity reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "PHOTO_DELETED: management permanently removed this photo; the original upload cannot be resumed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5925,6 +5995,10 @@
                     },
                     "failed": {
                       "type": "integer"
+                    },
+                    "deleted": {
+                      "type": "integer",
+                      "description": "Removed photos whose file cleanup and capacity release completed in this run."
                     }
                   },
                   "required": [
@@ -6078,7 +6152,8 @@
               }
             }
           }
-        }
+        },
+        "description": " Also retries durable pending photo deletions in bounded groups."
       }
     },
     "/gallery/photos/{photoId}": {
@@ -6369,6 +6444,173 @@
             }
           }
         ]
+      },
+      "delete": {
+        "summary": "Permanently delete one gallery photo",
+        "operationId": "deleteAdminGalleryPhoto",
+        "tags": [
+          "Gallery management"
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-photo removal results; accepted cleanup may be pending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryDeleteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Admin sign-in required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission, verification or origin rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo or record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload incomplete, attempt consumed, busy photo or capacity reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON request exceeds 32 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Image bytes fail validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Session or request limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Gallery disabled, allowance review expired, operation limit or temporary storage failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "photoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          },
+          {
+            "name": "X-Admin-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryDeleteInput"
+              }
+            }
+          }
+        },
+        "description": "Requires an admin session, JSON, X-Admin-Request:true and confirmation=\"delete\". Removes photo metadata from all gallery views immediately, then durably cleans staging, retained and published objects. Busy photos return a per-photo PHOTO_BUSY error for retry. Uncertain active transfers or storage failures queue cleanup; reserved bytes and photo counts are released exactly once after confirmed cleanup. Missing IDs and repeated requests are safe. Minimal server-only PhotoDeletions tombstones prevent upload retries from recreating deleted IDs. Existing image links/browser caches may last up to five minutes. Guest session lifetime upload limits are not reset."
       }
     },
     "/internal/gallery/maintenance": {
@@ -6399,6 +6641,10 @@
                     },
                     "failed": {
                       "type": "integer"
+                    },
+                    "deleted": {
+                      "type": "integer",
+                      "description": "Removed photos whose file cleanup and capacity release completed in this run."
                     }
                   },
                   "required": [
@@ -6539,7 +6785,8 @@
               }
             }
           }
-        }
+        },
+        "description": " Also retries durable pending photo deletions in bounded groups."
       }
     },
     "/admin/food-items/bulk-delete": {
@@ -6910,6 +7157,166 @@
             }
           }
         }
+      }
+    },
+    "/admin/gallery/photos/bulk-delete": {
+      "post": {
+        "summary": "Permanently delete up to 25 gallery photos",
+        "operationId": "postAdminGalleryPhotosBulkDelete",
+        "tags": [
+          "Gallery management"
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-photo removal results; accepted cleanup may be pending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryDeleteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Admin sign-in required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission, verification or origin rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo or record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload incomplete, attempt consumed, busy photo or capacity reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON request exceeds 32 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Use application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Image bytes fail validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Session or request limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Gallery disabled, allowance review expired, operation limit or temporary storage failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Admin-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryBulkDeleteInput"
+              }
+            }
+          }
+        },
+        "description": "Requires an admin session, JSON, X-Admin-Request:true and confirmation=\"delete\". Removes photo metadata from all gallery views immediately, then durably cleans staging, retained and published objects. Busy photos return a per-photo PHOTO_BUSY error for retry. Uncertain active transfers or storage failures queue cleanup; reserved bytes and photo counts are released exactly once after confirmed cleanup. Missing IDs and repeated requests are safe. Minimal server-only PhotoDeletions tombstones prevent upload retries from recreating deleted IDs. Existing image links/browser caches may last up to five minutes. Guest session lifetime upload limits are not reset."
       }
     }
   },
@@ -8755,6 +9162,96 @@
           "missingIds",
           "releasedFoodSlots",
           "removedChoices"
+        ]
+      },
+      "GalleryDeleteInput": {
+        "type": "object",
+        "properties": {
+          "confirmation": {
+            "type": "string",
+            "enum": [
+              "delete"
+            ]
+          }
+        },
+        "required": [
+          "confirmation"
+        ],
+        "additionalProperties": false
+      },
+      "GalleryBulkDeleteInput": {
+        "type": "object",
+        "properties": {
+          "confirmation": {
+            "type": "string",
+            "enum": [
+              "delete"
+            ]
+          },
+          "photoIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 25,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          }
+        },
+        "required": [
+          "confirmation",
+          "photoIds"
+        ],
+        "additionalProperties": false
+      },
+      "GalleryDeleteResult": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{32}$"
+                },
+                "success": {
+                  "type": "boolean"
+                },
+                "pending": {
+                  "type": "boolean",
+                  "description": "Accepted removal; physical file cleanup is still queued and capacity remains reserved."
+                },
+                "missing": {
+                  "type": "boolean"
+                },
+                "error": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "success"
+              ]
+            }
+          }
+        },
+        "required": [
+          "results"
         ]
       }
     }

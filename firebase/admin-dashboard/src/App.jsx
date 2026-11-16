@@ -701,7 +701,7 @@ export default function App() {
             {notice}
           </p>
         )}
-        {tab === "gallery" ? <Gallery /> : !data ? (
+        {tab === "gallery" ? <Gallery Modal={Modal} /> : !data ? (
           <Empty>
             {busy
               ? "Loading the evening's details…"

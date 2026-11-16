@@ -1,13 +1,15 @@
 const { ApiError } = require("./errors");
 function createGalleryStorage(config, reserve) {
-  async function command(action, source, target) {
-    await reserve(action === "copy" ? 1 : 0, action === "delete" ? 0 : 1);
+  async function command(action, source, target, objects) {
+    // R2 deletions are free operations; they must also work when the read/write
+    // operation budget is exhausted. The Worker still enforces its cost cutoff.
+    if (action !== "delete" && action !== "delete-many") await reserve(action === "copy" ? 1 : 0, 1);
     let response;
     try {
       // No automatic retry: a timed-out attempt remains counted.
       response = await fetch(`${config.workerUrl}/internal/storage`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.internalSecret}` },
-        body: JSON.stringify({ action, source, ...(target ? { target } : {}) }), signal: AbortSignal.timeout(8000),
+        body: JSON.stringify({ action, source, ...(target ? { target } : {}), ...(objects ? { objects } : {}) }), signal: AbortSignal.timeout(8000),
       });
     } catch { throw new ApiError(503, "STORAGE_UNAVAILABLE", "Photo storage is temporarily unavailable. Please retry."); }
     if (response.status === 404) throw new ApiError(409, "UPLOAD_INCOMPLETE", "The photo has not finished uploading. Please retry.");
@@ -21,6 +23,6 @@ function createGalleryStorage(config, reserve) {
     }
     return Buffer.concat(chunks);
   }
-  return { read: ref => command("read", ref), copy: (source, target) => command("copy", source, target), delete: ref => command("delete", ref) };
+  return { read: ref => command("read", ref), copy: (source, target) => command("copy", source, target), delete: ref => command("delete", ref), deleteMany: objects => command("delete-many", undefined, undefined, objects) };
 }
 module.exports = { createGalleryStorage };

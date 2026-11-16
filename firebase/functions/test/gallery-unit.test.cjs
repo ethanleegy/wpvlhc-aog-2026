@@ -32,3 +32,14 @@ test("gallery is opt in and stops at its approved billing period", () => {
   assert.throws(() => loadGalleryConfig({ GALLERY_ENABLED: "true" }, false), /requires at least/);
 });
 module.exports = { image };
+test("free storage deletions do not consume or require the read/write operation budget", async () => {
+  const { createGalleryStorage } = require("../src/gallery-storage");
+  const previous = global.fetch, commands = [];
+  global.fetch = async (_, options) => { commands.push(JSON.parse(options.body)); return Response.json({ deleted: true }); };
+  try {
+    const storage = createGalleryStorage({ workerUrl: "https://worker.example", internalSecret: "unit-test-only" }, () => { throw new Error("Read/write budget must not be used for deletion"); });
+    const object = { bucket: "private", key: "test-object" };
+    await storage.delete(object); await storage.deleteMany([object]);
+    assert.deepEqual(commands.map(command => command.action), ["delete", "delete-many"]);
+  } finally { global.fetch = previous; }
+});
